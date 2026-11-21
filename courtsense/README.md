@@ -2,11 +2,12 @@
 
 A Streamlit chatbot that explains sports rules, strategy and stats in plain
 language. Built for new fans, student athletes and beginner players. It covers
-basketball, volleyball and football (soccer), with a "More" menu for other sports.
+basketball, volleyball and football (soccer), only.
 
 ## Features
-- Sport and topic pickers (Rules, Strategy, Stats, Quiz, Watch-along)
+- Sport and topic pickers (Rules, Strategy, Stats, Quiz), each with its own chat
 - Detail level (Beginner, Intermediate, Advanced), model and temperature controls
+- Sport-themed look (colour and court art change per sport), light and dark mode
 - Streaming answers with stat comparison tables and quick actions
   (Show example, Quiz me, Explain simpler)
 - Upload a box score or notes (txt, csv, md, pdf) with the + button

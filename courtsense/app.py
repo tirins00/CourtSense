@@ -8,27 +8,36 @@ from groq import Groq
 
 import defenses
 from prompts import build_system_prompt
-from styles import CSS
+from styles import get_css
 
 st.set_page_config(page_title="CourtSense", page_icon=":material/sports_basketball:", layout="centered")
-st.markdown(CSS, unsafe_allow_html=True)
 
-SPORTS = ["Basketball", "Volleyball", "Football", "More"]
-OTHER_SPORTS = ["Tennis", "Badminton", "Baseball", "Table tennis", "Rugby", "Cricket", "Athletics", "Swimming"]
-TOPICS = ["Rules", "Strategy", "Stats", "Quiz", "Watch-along"]
+SPORTS = ["Basketball", "Volleyball", "Football"]
+TOPICS = ["Rules", "Strategy", "Stats", "Quiz"]
 LEVELS = ["Beginner", "Intermediate", "Advanced"]
 MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+TOPIC_ICONS = {
+    "Rules": ":material/gavel:",
+    "Strategy": ":material/schema:",
+    "Stats": ":material/bar_chart:",
+    "Quiz": ":material/quiz:",
+}
 AVATARS = {
     "Basketball": ":material/sports_basketball:",
     "Volleyball": ":material/sports_volleyball:",
     "Football": ":material/sports_soccer:",
+}
+TAGLINES = {
+    "Rules": "Every whistle, explained.",
+    "Strategy": "Why teams line up the way they do.",
+    "Stats": "What the numbers actually mean.",
+    "Quiz": "Five questions, one at a time.",
 }
 PLACEHOLDERS = {
     "Rules": "Ask about a rule, foul, or penalty",
     "Strategy": "Ask about a play or formation",
     "Stats": "Ask about a stat, or press + to attach a box score",
     "Quiz": "Type your answer, or ask for a new question",
-    "Watch-along": "Describe what just happened",
 }
 STARTERS = {
     "Basketball": {
@@ -48,20 +57,39 @@ STARTERS = {
     },
 }
 
-# ---------- state ----------
 ss = st.session_state
-ss.setdefault("messages", [])
+ss.setdefault("threads", {})
 ss.setdefault("queued", None)
 ss.setdefault("generate", False)
+ss.setdefault("sport", SPORTS[0])
+ss.setdefault("topic", TOPICS[0])
+
+
+sport = ss.sport
+topic = ss.topic
+dark = ss.get("dark", False)
+thread_key = f"{sport}|{topic}"
+ss.messages = ss.threads.setdefault(thread_key, [])   # each sport + topic has its own chat
+
+st.markdown(get_css(sport, topic, dark), unsafe_allow_html=True)
 
 
 def queue(text):
     ss.queued = text
 
 
-def current_sport():
-    s = ss.get("sport") or "Basketball"
-    return ss.get("more_sport", OTHER_SPORTS[0]) if s == "More" else s
+def set_sport(name):
+    ss.sport = name
+
+
+def set_topic(name):
+    ss.topic = name
+
+
+def start_quiz():
+    """Jump to the Quiz tab for this sport and start a quiz there."""
+    ss.topic = "Quiz"
+    ss.queued = f"Start a 5-question {ss.sport} trivia quiz. One question at a time."
 
 
 def get_client():
@@ -125,9 +153,9 @@ def read_upload(f):
     return text[: defenses.MAX_FILE_CHARS]
 
 
-def build_messages(sport, topic, level, token):
+def build_messages(topic_now, level, token):
     msgs = [{"role": "system",
-             "content": build_system_prompt(sport, topic, level, token, defenses.CANARY)}]
+             "content": build_system_prompt(sport, topic_now, level, token, defenses.CANARY)}]
     hist = ss.messages
     last_att = max((i for i, m in enumerate(hist) if m.get("attachment")), default=-1)
     live = [(i, m) for i, m in enumerate(hist) if not m.get("blocked")][-12:]
@@ -143,7 +171,7 @@ def build_messages(sport, topic, level, token):
 
 
 def export_markdown():
-    lines = ["# CourtSense chat", ""]
+    lines = [f"# CourtSense: {sport}, {topic}", ""]
     for m in ss.messages:
         who = "You" if m["role"] == "user" else "CourtSense"
         lines += [f"**{who}:** {m['content']}", ""]
@@ -152,27 +180,24 @@ def export_markdown():
 
 # ---------- sidebar ----------
 with st.sidebar:
-    st.subheader("Game settings")
+    st.subheader("Settings")
     level = st.radio("Detail level", LEVELS, key="level")
     model_options = list_chat_models(get_client())
     model = st.selectbox("Model", model_options, index=default_model_index(model_options), key="model")
     temperature = st.slider("Temperature", 0.0, 1.0, 0.4, 0.1, key="temp",
                             help="Lower is more consistent. Higher is more varied.")
     st.divider()
-    st.download_button("Export chat", export_markdown(), "courtsense_chat.md",
+    st.download_button("Export this chat", export_markdown(), f"courtsense_{sport}_{topic}.md".lower(),
                        disabled=not ss.messages, use_container_width=True)
-    if st.button("New game (clear chat)", use_container_width=True):
-        ss.messages, ss.queued, ss.generate = [], None, False
+    if st.button("Clear this chat", use_container_width=True):
+        ss.threads[thread_key] = []
+        ss.queued, ss.generate = None, False
         st.rerun()
-    st.caption("CourtSense explains rules, plays and stats. It does not give betting "
-               "tips, and it only uses numbers you provide.")
-
-sport = current_sport()
-topic = ss.get("topic") or "Rules"
+    st.caption("Each sport and topic keeps its own chat. CourtSense explains rules, plays and "
+               "stats. It does not give betting tips, and it only uses numbers you provide.")
 
 # ---------- input ----------
-value = st.chat_input(PLACEHOLDERS[topic], accept_file=True,
-                      file_type=["txt", "csv", "md", "pdf"])
+value = st.chat_input(PLACEHOLDERS[topic], accept_file=True, file_type=["txt", "csv", "md", "pdf"])
 text, files = None, []
 if value:
     text = (getattr(value, "text", None) or "").strip()
@@ -183,8 +208,7 @@ if ss.queued:
 if text or files:
     text = (text or "Summarize this game from the attached data.")[: defenses.MAX_INPUT_CHARS]
     attachment, blocked, reason = None, False, None
-    safe, _ = defenses.check_input(text)
-    if not safe:
+    if not defenses.check_input(text)[0]:
         blocked = True
     elif files:
         try:
@@ -200,46 +224,44 @@ if text or files:
     ss.messages.append({"role": "user", "content": text, "attachment": attachment,
                         "file_name": files[0].name if files else None, "blocked": blocked})
     if blocked or reason:
-        ss.messages.append({"role": "assistant", "content": reason or defenses.BLOCKED_REPLY,
-                            "blocked": True})
+        ss.messages.append({"role": "assistant", "content": reason or defenses.BLOCKED_REPLY, "blocked": True})
     else:
         ss.generate = True
 
-# ---------- header ----------
-st.markdown(
-    f"""<div class="board">
-      <div class="brand">CourtSense<small>Rules, plays and stats, explained.</small></div>
-      <div class="cells">
-        <div class="cell"><span class="k">Sport</span><span class="v">{sport}</span></div>
-        <div class="cell"><span class="k">Topic</span><span class="v">{topic}</span></div>
-        <div class="cell"><span class="k">Level</span><span class="v">{level}</span></div>
-      </div></div>""",
-    unsafe_allow_html=True,
-)
-st.pills("Sport", SPORTS, default="Basketball", key="sport", label_visibility="collapsed")
-if ss.get("sport") == "More":
-    st.selectbox("Pick a sport", OTHER_SPORTS, key="more_sport", label_visibility="collapsed")
-st.pills("Topic", TOPICS, default="Rules", key="topic", label_visibility="collapsed")
+# ---------- hero: title, sport buttons, topic tabs ----------
+with st.container(key="hero"):
+    c1, c2 = st.columns([3, 1.4], vertical_alignment="center")
+    c1.markdown('<span class="wordmark">CourtSense</span>', unsafe_allow_html=True)
+    c2.toggle("Dark mode", key="dark")
+    st.markdown(f'<div class="hero-title">{sport}</div><p class="hero-sub">{TAGLINES[topic]}</p>',
+                unsafe_allow_html=True)
+    cols = st.columns([1, 1, 1, 0.9])
+    for col, name in zip(cols, SPORTS):
+        col.button(name, key=f"sp_{name}", icon=AVATARS[name], on_click=set_sport, args=(name,),
+                   use_container_width=True)
+    with st.container(key="topics"):
+        cols = st.columns([1, 1, 1, 1, 1.4])
+        for col, name in zip(cols, TOPICS):
+            col.button(name, key=f"tp_{name}", icon=TOPIC_ICONS[name], on_click=set_topic, args=(name,),
+                       use_container_width=True)
 
-icon = AVATARS.get(sport, ":material/sports:")
+icon = AVATARS[sport]
 
 # ---------- empty state ----------
 if not ss.messages:
-    if topic == "Watch-along":
-        st.markdown('<p class="hint">Describe what just happened, like "the ref whistled the '
-                    'point guard after two steps", and I will explain the call.</p>',
+    if topic == "Quiz":
+        st.markdown(f'<div class="empty"><div class="empty-title">Test your {sport.lower()} knowledge</div>'
+                    '<p>Five multiple-choice questions, one at a time, with a score at the end.</p></div>',
                     unsafe_allow_html=True)
-    elif topic == "Quiz":
-        st.markdown('<p class="hint">Five questions, one at a time.</p>', unsafe_allow_html=True)
-        st.button(f"Start a {sport} quiz", on_click=queue,
+        st.button(f"Start the {sport} quiz", key="startquiz", on_click=queue,
                   args=(f"Start a 5-question {sport} trivia quiz. One question at a time.",))
     else:
-        options = STARTERS.get(sport, {}).get(topic) or [f"Give me a beginner's guide to {sport}"]
-        st.markdown('<p class="hint">Try one of these, or type your own question.</p>', unsafe_allow_html=True)
-        for i, q in enumerate(options):
-            st.markdown('<div class="starter">', unsafe_allow_html=True)
-            st.button(q, key=f"starter_{i}", on_click=queue, args=(q,))
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(f'<div class="empty"><div class="empty-title">{topic} in {sport.lower()}</div>'
+                    '<p>Pick a starter or type your own question below.</p></div>', unsafe_allow_html=True)
+        with st.container(key="starters"):
+            cols = st.columns(2)
+            for i, q in enumerate(STARTERS[sport][topic]):
+                cols[i % 2].button(q, key=f"starter_{i}", on_click=queue, args=(q,), use_container_width=True)
 
 # ---------- history ----------
 last = len(ss.messages) - 1
@@ -249,13 +271,10 @@ for i, m in enumerate(ss.messages):
         if m.get("file_name") and m["role"] == "user":
             st.markdown(f'<span class="attach">Attached: {m["file_name"]}</span>', unsafe_allow_html=True)
         if i == last and m["role"] == "assistant" and not m.get("blocked") and not ss.generate:
-            c1, c2, c3, _ = st.columns([1.2, 1, 1.2, 2])
-            c1.button("Show example", key="qa_ex", on_click=queue,
-                      args=("Show me one real-game example of that.",))
-            c2.button("Quiz me", key="qa_quiz", on_click=queue,
-                      args=("Quiz me on this, one question at a time.",))
-            c3.button("Explain simpler", key="qa_simple", on_click=queue,
-                      args=("Explain that again in simpler words.",))
+            c1, c2, c3, _ = st.columns([1.3, 1.1, 1.4, 1.6])
+            c1.button("Show example", key="qa_ex", on_click=queue, args=("Show me one real-game example of that.",))
+            c2.button("Quiz me", key="qa_quiz", on_click=start_quiz)
+            c3.button("Explain simpler", key="qa_simple", on_click=queue, args=("Explain that again in simpler words.",))
 
 # ---------- generate ----------
 if ss.generate:
@@ -269,7 +288,7 @@ if ss.generate:
             topic_now = "Quiz" if "quiz" in last_user else topic
             stream = client.chat.completions.create(
                 model=model, temperature=temperature, max_tokens=500, stream=True,
-                messages=build_messages(sport, topic_now, level, token),
+                messages=build_messages(topic_now, level, token),
             )
             for chunk in stream:
                 reply += chunk.choices[0].delta.content or ""
@@ -279,8 +298,7 @@ if ss.generate:
                     break
         except Exception as e:
             detail = str(e).replace(os.environ.get("GROQ_API_KEY", "\x00"), "***")[:300]
-            reply = ("I couldn't reach the AI service just now.\n\n"
-                     f"Error: `{type(e).__name__}` {detail}")
+            reply = f"I couldn't reach the AI service just now.\n\nError: `{type(e).__name__}` {detail}"
         if defenses.leaked(reply):
             reply = defenses.LEAK_REPLY
         box.markdown(reply)
