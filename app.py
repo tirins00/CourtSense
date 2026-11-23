@@ -3,7 +3,9 @@ import base64
 import html
 import inspect
 import io
+import json
 import os
+import random
 import re
 import sys
 from pathlib import Path
@@ -18,7 +20,7 @@ import streamlit as st
 from groq import Groq
 
 import defenses
-from prompts import build_system_prompt
+from prompts import build_quiz_prompt, build_system_prompt
 from styles import get_css
 
 _SUPPORTS_INLINE_JS = "unsafe_allow_javascript" in inspect.signature(st.html).parameters
@@ -69,6 +71,35 @@ STARTERS = {
         "Stats": ["What is xG (expected goals)?", "What counts as an assist?"],
     },
 }
+QUIZ_LEN = 5
+QUIZ_THEMES = {
+    "Basketball": [
+        "scoring and point values", "personal and technical fouls", "travelling and dribbling violations",
+        "shot clock and game timing", "court dimensions and markings", "player positions and roles",
+        "NBA history and founding", "FIBA vs NBA rule differences", "all-time records and milestones",
+        "offensive plays (pick and roll, give and go)", "defensive schemes (zone, man-to-man)",
+        "box score stats and terminology", "referee signals", "Olympic and international basketball",
+        "WNBA history", "free throws and bonus situations", "the NBA Draft and awards",
+    ],
+    "Volleyball": [
+        "rotation rules", "rally scoring and set length", "libero rules", "net and centre-line faults",
+        "serving rules", "player positions and roles", "attacking and blocking rules",
+        "beach vs indoor volleyball", "history and invention of volleyball", "Olympic volleyball",
+        "stats terminology (kills, digs, aces)", "court dimensions", "substitutions and timeouts",
+        "ball-handling faults (lift, double contact)", "offensive systems (5-1, 6-2)",
+        "referee signals", "FIVB competitions",
+    ],
+    "Football": [
+        "the offside rule", "fouls, yellow and red cards", "set pieces (free kicks, corners)",
+        "VAR and refereeing", "formations and tactics", "FIFA World Cup history",
+        "European club competitions", "player positions and roles", "goalkeeper rules",
+        "match duration, stoppage time and extra time", "penalty shootouts",
+        "stats terminology (xG, assists, clean sheets)", "pitch dimensions and markings",
+        "all-time records and legends", "substitution rules", "the Laws of the Game and IFAB",
+        "continental tournaments (Euros, Copa America, AFCON)",
+    ],
+}
+LETTERS = "ABCD"
 
 ss = st.session_state
 ss.setdefault("threads", {})
@@ -78,6 +109,10 @@ ss.setdefault("reply_idx", None)
 ss.setdefault("generate", False)
 ss.setdefault("sport", SPORTS[0])
 ss.setdefault("topic", TOPICS[0])
+ss.setdefault("quizzes", {})       # sport -> active quiz state
+ss.setdefault("quiz_pending", {})  # sport -> True when a new quiz should be generated
+ss.setdefault("quiz_error", {})    # sport -> last generation error
+ss.setdefault("quiz_seen", {})     # sport -> recent question texts (avoid repeats)
 
 
 sport = ss.sport
@@ -92,8 +127,8 @@ _ACTION_SCRIPT = """
 <div class="cs-script-host" style="display:none" aria-hidden="true"></div>
 <script>
 (function () {
-  if (window.__csActionsBound) return;
-  window.__csActionsBound = true;
+  if (window.__csActionsBoundV2) return;
+  window.__csActionsBoundV2 = true;
 
   function decodeB64(b64) {
     if (!b64) return "";
@@ -142,30 +177,36 @@ _ACTION_SCRIPT = """
   }
 
   function flashButton(btn, label, ms) {
+    // Icon-only buttons show feedback as a small tooltip (data-tip); labelled buttons swap text.
     const span = btn.querySelector(".cs-btn-label");
-    if (!span) return;
-    if (!btn.dataset.origLabel) btn.dataset.origLabel = span.textContent;
-    span.textContent = label;
+    btn.dataset.tip = label;
+    if (span) {
+      if (!btn.dataset.origLabel) btn.dataset.origLabel = span.textContent;
+      span.textContent = label;
+    }
     btn.classList.add("is-done");
     clearTimeout(btn._csTimer);
     btn._csTimer = setTimeout(() => {
-      span.textContent = btn.dataset.origLabel;
+      if (span) span.textContent = btn.dataset.origLabel;
       btn.classList.remove("is-done");
     }, ms || 1900);
   }
 
-  function findTargetInput(btn) {
-    const card = btn.closest('[data-testid="stChatMessage"]');
-    if (card) {
-      const inlineInput = card.querySelector('[data-testid="stTextInputField"]');
-      if (inlineInput && !inlineInput.disabled) return inlineInput;
+  function findTargetInput() {
+    const selectors = [
+      '[role="dialog"] [data-testid="stTextInputField"]',
+      '[role="dialog"] input[type="text"]',
+      '[data-testid="stChatInputTextArea"]',
+    ];
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el && !el.disabled) return el;
     }
-    const chatInput = document.querySelector('[data-testid="stChatInputTextArea"]');
-    if (chatInput && !chatInput.disabled) return chatInput;
     return null;
   }
 
-  document.addEventListener("click", async function (e) {
+  // Capture phase on window so this runs first and stops older cached handlers from double-firing.
+  window.addEventListener("click", async function (e) {
     const btn = e.target.closest("[data-cs-action]");
     if (!btn) {
       if (!e.target.closest(".cs-share-menu")) {
@@ -173,6 +214,7 @@ _ACTION_SCRIPT = """
       }
       return;
     }
+    e.stopPropagation();
 
     const action = btn.dataset.csAction;
 
@@ -188,7 +230,7 @@ _ACTION_SCRIPT = """
     }
 
     if (action === "paste") {
-      const target = findTargetInput(btn);
+      const target = findTargetInput();
       if (!target) {
         flashButton(btn, "No input open");
         return;
@@ -276,7 +318,7 @@ _ACTION_SCRIPT = """
       flashButton(btn, "Saved!");
       return;
     }
-  });
+  }, true);
 })();
 </script>
 """
@@ -316,11 +358,7 @@ def render_user_copy_bar(text):
         '<div class="cs-user-actions">'
         f'<button type="button" class="cs-user-copy" data-cs-action="copy" data-payload="{payload}" '
         'title="Copy prompt" aria-label="Copy prompt">'
-        '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" '
-        'stroke-linecap="round" stroke-linejoin="round">'
-        '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>'
-        '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>'
-        '</svg>'
+        '<span class="cs-ic cs-ic-copy-light" aria-hidden="true"></span>'
         '<span class="cs-btn-label">Copy</span>'
         '</button>'
         '</div>'
@@ -360,37 +398,13 @@ def render_assistant_actions(idx, text, question):
     bar = (
         '<div class="cs-actions-wrap">'
         '<div class="cs-actions">'
-        f'<button type="button" class="cs-act-btn" data-cs-action="copy" data-payload="{payload}" '
-        'title="Copy answer to clipboard" aria-label="Copy answer">'
-        '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" '
-        'stroke-linecap="round" stroke-linejoin="round">'
-        '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>'
-        '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>'
-        '</svg>'
-        '<span class="cs-btn-label">Copy</span>'
-        '</button>'
-        '<button type="button" class="cs-act-btn" data-cs-action="paste" '
-        'title="Paste clipboard into reply or chat bar" aria-label="Paste into input">'
-        '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" '
-        'stroke-linecap="round" stroke-linejoin="round">'
-        '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>'
-        '<rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>'
-        '</svg>'
-        '<span class="cs-btn-label">Paste</span>'
-        '</button>'
-        f'<button type="button" class="cs-act-btn" data-cs-action="share" '
+        f'<button type="button" class="cs-act-btn cs-icon-btn" data-cs-action="copy" data-payload="{payload}" '
+        'title="Copy answer" aria-label="Copy answer"><span class="cs-ic cs-ic-copy" aria-hidden="true"></span></button>'
+        '<button type="button" class="cs-act-btn cs-icon-btn" data-cs-action="paste" '
+        'title="Paste clipboard into the chat bar" aria-label="Paste into input"><span class="cs-ic cs-ic-paste" aria-hidden="true"></span></button>'
+        f'<button type="button" class="cs-act-btn cs-icon-btn" data-cs-action="share" '
         f'data-title="{title_b64}" data-share-text="{share_b64}" '
-        'title="Share this answer" aria-label="Share answer">'
-        '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" '
-        'stroke-linecap="round" stroke-linejoin="round">'
-        '<circle cx="18" cy="5" r="3"></circle>'
-        '<circle cx="6" cy="12" r="3"></circle>'
-        '<circle cx="18" cy="19" r="3"></circle>'
-        '<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>'
-        '<line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>'
-        '</svg>'
-        '<span class="cs-btn-label">Share</span>'
-        '</button>'
+        'title="Share answer" aria-label="Share answer"><span class="cs-ic cs-ic-share" aria-hidden="true"></span></button>'
         '</div>'
         '<div class="cs-share-menu" role="menu" aria-label="Share options">'
         f'<button type="button" class="cs-share-item" data-cs-action="share-copy" data-share-text="{share_b64}">'
@@ -404,17 +418,49 @@ def render_assistant_actions(idx, text, question):
         '</div>'
         '</div>'
     )
-    st.html(bar, unsafe_allow_javascript=True)
+    st.html(bar, width="content", unsafe_allow_javascript=True)
+
+
+@st.dialog("Reply or follow up", width="medium")
+def reply_dialog(idx):
+    """Pop-up text box for replying to (or following up on) an assistant answer."""
+    msg = ss.messages[idx]
+    is_latest = idx == len(ss.messages) - 1
+    snippet = _short_snippet(msg["content"], 95)
+    st.markdown(
+        f'<div class="reply-quote">Replying to: &ldquo;{html.escape(snippet)}&rdquo;</div>',
+        unsafe_allow_html=True,
+    )
+    with st.container(key=f"followup_box_{idx}"):
+        with st.form(key=f"followup_form_{idx}", clear_on_submit=True, border=False):
+            fc1, fc2 = st.columns([5.2, 1.3], vertical_alignment="center")
+            follow_val = fc1.text_input(
+                "Your reply",
+                placeholder="Ask a follow-up about this answer…",
+                label_visibility="collapsed",
+                key=f"followup_in_{idx}",
+            )
+            sent = fc2.form_submit_button("Send", icon=":material/send:", use_container_width=True)
+    if sent and follow_val and follow_val.strip():
+        queue(follow_val.strip(), reply_to=None if is_latest else snippet)
+        st.rerun()
+
+
+def render_message_tools(idx, msg):
+    """Icon toolbar (copy / paste / share) and a Reply button, shown below an assistant card."""
+    prev_q = ss.messages[idx - 1]["content"] if idx > 0 and ss.messages[idx - 1]["role"] == "user" else ""
+    with st.container(key=f"tools_{idx}", horizontal=True, vertical_alignment="center", gap="small"):
+        render_assistant_actions(idx, msg["content"], prev_q)
+        if not msg.get("blocked"):
+            if st.button("Reply", key=f"reply_btn_{idx}", icon=":material/reply:",
+                         help="Reply or ask a follow-up about this answer"):
+                reply_dialog(idx)
 
 
 def queue(text, reply_to=None):
     ss.queued = text
     ss.queued_reply_to = reply_to
     ss.reply_idx = None
-
-
-def toggle_reply(idx):
-    ss.reply_idx = None if ss.reply_idx == idx else idx
 
 
 def set_sport(name):
@@ -428,11 +474,99 @@ def set_topic(name):
 
 
 def start_quiz():
-    """Jump to the Quiz tab for this sport and start a quiz there."""
+    """Jump to the Quiz tab for this sport and generate a fresh, random quiz."""
     ss.topic = "Quiz"
-    ss.queued = f"Start a 5-question {ss.sport} trivia quiz. One question at a time."
-    ss.queued_reply_to = None
+    ss.quiz_pending[ss.sport] = True
+    ss.quiz_error.pop(ss.sport, None)
     ss.reply_idx = None
+
+
+def answer_quiz(choice):
+    quiz = ss.quizzes.get(ss.sport)
+    if not quiz or len(quiz["picks"]) > quiz["idx"]:
+        return
+    quiz["picks"].append(choice)
+    if choice == quiz["questions"][quiz["idx"]]["answer"]:
+        quiz["score"] += 1
+
+
+def next_question():
+    quiz = ss.quizzes.get(ss.sport)
+    if quiz:
+        quiz["idx"] += 1
+
+
+def _strip_letter(text):
+    return re.sub(r"^\(?[A-Da-d][\).:]\s+", "", str(text or "")).strip()
+
+
+def parse_quiz(raw, n):
+    """Validate the model's JSON quiz and shuffle answer positions."""
+    cleaned = re.sub(r"<think>.*?</think>", "", raw or "", flags=re.S).strip()
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.I).strip()
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}|\[.*\]", cleaned, re.S)
+        if not m:
+            raise ValueError("The model returned a quiz I couldn't read. Try again.")
+        data = json.loads(m.group(0))
+    items = data.get("questions", []) if isinstance(data, dict) else data
+    out = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        question = str(item.get("question", "")).strip()
+        options = [_strip_letter(o) for o in (item.get("options") or []) if str(o).strip()]
+        ans = item.get("answer")
+        idx = None
+        if isinstance(ans, int) and 0 <= ans < len(options):
+            idx = ans
+        else:
+            a = _strip_letter(ans)
+            lowered = [o.lower() for o in options]
+            if a.lower() in lowered:
+                idx = lowered.index(a.lower())
+            elif len(a) == 1 and a.upper() in LETTERS[: len(options)]:
+                idx = LETTERS.index(a.upper())
+        if not question or len(options) != 4 or idx is None or len({o.lower() for o in options}) < 4:
+            continue
+        correct = options[idx]
+        random.shuffle(options)
+        out.append({
+            "question": question,
+            "options": options,
+            "answer": options.index(correct),
+            "explanation": str(item.get("explanation", "")).strip(),
+        })
+    if len(out) < 3:
+        raise ValueError("The model returned a quiz I couldn't use. Try again, or pick another model.")
+    return out[:n]
+
+
+def generate_quiz(n=QUIZ_LEN):
+    """Ask the model for n random multiple-choice questions about the current sport."""
+    themes = random.sample(QUIZ_THEMES[sport], k=min(n, len(QUIZ_THEMES[sport])))
+    seen = ss.quiz_seen.setdefault(sport, [])
+    prompt = build_quiz_prompt(sport, level, themes, seen[-25:], random.randint(10000, 99999))
+    kwargs = dict(
+        model=model,
+        temperature=max(0.9, temperature),
+        max_tokens=2000,
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": f"Write {n} new {sport} quiz questions as JSON."},
+        ],
+    )
+    client = get_client()
+    try:
+        resp = client.chat.completions.create(response_format={"type": "json_object"}, **kwargs)
+    except Exception:
+        resp = client.chat.completions.create(**kwargs)  # model without JSON mode
+    questions = parse_quiz(resp.choices[0].message.content, n)
+    seen.extend(q["question"] for q in questions)
+    del seen[:-60]
+    return questions
 
 
 def get_client():
@@ -540,10 +674,120 @@ def build_messages(topic_now, level, token):
 
 def export_markdown():
     lines = [f"# CourtSense: {sport}, {topic}", ""]
+    if topic == "Quiz":
+        quiz = ss.quizzes.get(sport)
+        if quiz:
+            for n, (q, pick) in enumerate(zip(quiz["questions"], quiz["picks"]), 1):
+                mark = "Correct" if pick == q["answer"] else "Wrong"
+                lines += [f"**Q{n}. {q['question']}**", f"- Your answer: {q['options'][pick]} ({mark})",
+                          f"- Correct answer: {q['options'][q['answer']]}", ""]
+            lines.append(f"**Score: {quiz['score']} / {len(quiz['questions'])}**")
+        return "\n".join(lines)
     for m in ss.messages:
         who = "You" if m["role"] == "user" else "CourtSense"
         lines += [f"**{who}:** {m['content']}", ""]
     return "\n".join(lines)
+
+
+def render_quiz():
+    """Button-based multiple-choice quiz for the current sport (no typing)."""
+    quiz = ss.quizzes.get(sport)
+    error = ss.quiz_error.get(sport)
+
+    if not quiz:
+        st.markdown(
+            f'<div class="empty">'
+            f'<span class="empty-badge">TRIVIA CHALLENGE</span>'
+            f'<div class="empty-title">Test your {sport} IQ</div>'
+            f'<p>{QUIZ_LEN} fresh multiple-choice questions, generated at random every time. '
+            f'Tap an answer to lock it in.</p>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        if error:
+            st.error(error, icon=":material/error:")
+        st.button("Try again" if error else f"Start the {sport} quiz", key="startquiz", on_click=start_quiz,
+                  icon=":material/refresh:" if error else ":material/play_circle:", use_container_width=True)
+        return
+
+    questions, idx, score = quiz["questions"], quiz["idx"], quiz["score"]
+    total = len(questions)
+
+    # ----- finished: results -----
+    if idx >= total:
+        pct = score / total
+        verdict = ("Hall of Fame performance!" if pct == 1 else "Great game!" if pct >= 0.8
+                   else "Solid effort." if pct >= 0.5 else "Keep practising, you'll get there.")
+        st.markdown(
+            f'<div class="quiz-result">'
+            f'<span class="empty-badge">FINAL SCORE</span>'
+            f'<div class="quiz-result-score">{score}<span>/ {total}</span></div>'
+            f'<p>{verdict}</p>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        with st.expander("Review your answers", icon=":material/fact_check:"):
+            for n, (q, pick) in enumerate(zip(questions, quiz["picks"]), 1):
+                ok = pick == q["answer"]
+                st.markdown(
+                    f'<div class="quiz-review {"correct" if ok else "wrong"}">'
+                    f'<div class="quiz-review-q">{n}. {html.escape(q["question"])}</div>'
+                    f'<div>Your answer: {html.escape(q["options"][pick])}</div>'
+                    + ("" if ok else f'<div>Correct: {html.escape(q["options"][q["answer"]])}</div>')
+                    + '</div>',
+                    unsafe_allow_html=True,
+                )
+        with st.container(key="quiz_end_actions"):
+            c1, c2 = st.columns(2)
+            c1.button("New random quiz", key="quiz_again", icon=":material/shuffle:", on_click=start_quiz,
+                      use_container_width=True)
+            c2.button("Back to Rules", key="quiz_back", icon=":material/gavel:", on_click=set_topic,
+                      args=("Rules",), use_container_width=True)
+        return
+
+    # ----- in progress: one question at a time -----
+    q = questions[idx]
+    answered = len(quiz["picks"]) > idx
+    progress = (idx + (1 if answered else 0)) / total * 100
+    st.markdown(
+        f'<div class="quiz-head">'
+        f'<span class="quiz-count">Question {idx + 1} of {total}</span>'
+        f'<span class="quiz-score">Score {score}</span>'
+        f'</div>'
+        f'<div class="quiz-progress"><div style="width:{progress:.0f}%"></div></div>'
+        f'<div class="quiz-card"><div class="quiz-q">{html.escape(q["question"])}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    if not answered:
+        with st.container(key="quiz_opts"):
+            cols = st.columns(2)
+            for j, opt in enumerate(q["options"]):
+                cols[j % 2].button(f"{LETTERS[j]}.  {opt}", key=f"quiz_opt_{idx}_{j}", on_click=answer_quiz,
+                                   args=(j,), use_container_width=True)
+        return
+
+    pick = quiz["picks"][idx]
+    is_right = pick == q["answer"]
+    opts_html = "".join(
+        f'<div class="quiz-opt{" correct" if j == q["answer"] else " wrong" if j == pick else ""}">'
+        f'<span class="quiz-letter">{LETTERS[j]}</span>{html.escape(opt)}</div>'
+        for j, opt in enumerate(q["options"])
+    )
+    st.markdown(
+        f'<div class="quiz-opts-done">{opts_html}</div>'
+        f'<div class="quiz-feedback {"correct" if is_right else "wrong"}">'
+        f'<strong>{"Correct!" if is_right else "Not quite."}</strong> '
+        f'{html.escape(q["explanation"]) if q["explanation"] else ""}</div>',
+        unsafe_allow_html=True,
+    )
+    last_q = idx == total - 1
+    st.button(
+        "See results" if last_q else "Next question",
+        key="quiz_results" if last_q else "quiz_next",
+        on_click=next_question,
+        use_container_width=True,
+    )
 
 
 # ---------- sidebar ----------
@@ -561,9 +805,16 @@ with st.sidebar:
     temperature = st.slider("Temperature", 0.0, 1.0, 0.4, 0.1, key="temp",
                             help="Lower is more consistent. Higher is more varied.")
     st.divider()
-    st.download_button("Export this chat", export_markdown(), f"courtsense_{sport}_{topic}.md".lower(),
-                       icon=":material/download:", disabled=not ss.messages, use_container_width=True)
-    if st.button("Clear this chat", icon=":material/delete_sweep:", use_container_width=True):
+    has_content = bool(ss.quizzes.get(sport, {}).get("picks")) if topic == "Quiz" else bool(ss.messages)
+    st.download_button("Export this quiz" if topic == "Quiz" else "Export this chat", export_markdown(),
+                       f"courtsense_{sport}_{topic}.md".lower(),
+                       icon=":material/download:", disabled=not has_content, use_container_width=True)
+    if st.button("Reset this quiz" if topic == "Quiz" else "Clear this chat", icon=":material/delete_sweep:",
+                 use_container_width=True):
+        if topic == "Quiz":
+            ss.quizzes.pop(sport, None)
+            ss.quiz_error.pop(sport, None)
+            ss.quiz_pending.pop(sport, None)
         ss.threads[thread_key] = []
         ss.queued, ss.queued_reply_to, ss.reply_idx, ss.generate = None, None, None, False
         st.rerun()
@@ -571,8 +822,10 @@ with st.sidebar:
     st.caption("Each sport and topic keeps its own chat. CourtSense explains rules, plays and "
                "stats. It does not give betting tips, and it only uses numbers you provide.")
 
-# ---------- input ----------
-value = st.chat_input(PLACEHOLDERS[topic], accept_file=True, file_type=["txt", "csv", "md", "pdf"])
+# ---------- input (hidden in Quiz mode: the quiz is button-based) ----------
+value = None
+if topic != "Quiz":
+    value = st.chat_input(PLACEHOLDERS[topic], accept_file=True, file_type=["txt", "csv", "md", "pdf"])
 text, files, reply_to = None, [], None
 if value:
     text = (getattr(value, "text", None) or "").strip()
@@ -635,40 +888,41 @@ with st.container(key="hero"):
 
 icon = AVATARS[sport]
 
+# ---------- quiz mode (button-based, replaces the chat) ----------
+if topic == "Quiz":
+    if ss.quiz_pending.get(sport):
+        ss.quiz_pending[sport] = False
+        with st.spinner(f"Building a fresh {sport} quiz…"):
+            try:
+                ss.quizzes[sport] = {"questions": generate_quiz(), "idx": 0, "score": 0, "picks": []}
+                ss.quiz_error.pop(sport, None)
+            except Exception as e:
+                ss.quizzes.pop(sport, None)
+                detail = str(e)[:200] if isinstance(e, ValueError) else f"{type(e).__name__}"
+                ss.quiz_error[sport] = f"I couldn't build a quiz just now ({detail})."
+    render_quiz()
+
 # ---------- empty state ----------
-if not ss.messages:
-    if topic == "Quiz":
-        st.markdown(
-            f'<div class="empty">'
-            f'<span class="empty-badge">TRIVIA CHALLENGE</span>'
-            f'<div class="empty-title">Test your {sport} IQ</div>'
-            f'<p>Five multiple-choice questions, one at a time, with live feedback and scoring.</p>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-        st.button(f"Start the {sport} quiz", key="startquiz", on_click=queue,
-                  args=(f"Start a 5-question {sport} trivia quiz. One question at a time.",),
-                  icon=":material/play_circle:", use_container_width=True)
-    else:
-        st.markdown(
-            f'<div class="empty">'
-            f'<span class="empty-badge">{topic} PLAYBOOK</span>'
-            f'<div class="empty-title">{sport} {topic}</div>'
-            f'<p>Pick a starter question below or ask anything in plain language.</p>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-        with st.container(key="starters"):
-            cols = st.columns(2)
-            for i, q in enumerate(STARTERS[sport][topic]):
-                cols[i % 2].button(q, key=f"starter_{i}", on_click=queue, args=(q,),
-                                   icon=":material/arrow_forward:", use_container_width=True)
+elif not ss.messages:
+    st.markdown(
+        f'<div class="empty">'
+        f'<span class="empty-badge">{topic} PLAYBOOK</span>'
+        f'<div class="empty-title">{sport} {topic}</div>'
+        f'<p>Pick a starter question below or ask anything in plain language.</p>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+    with st.container(key="starters"):
+        cols = st.columns(2)
+        for i, q in enumerate(STARTERS[sport][topic]):
+            cols[i % 2].button(q, key=f"starter_{i}", on_click=queue, args=(q,),
+                               icon=":material/arrow_forward:", use_container_width=True)
 
 # ---------- history ----------
 last = len(ss.messages) - 1
-for i, m in enumerate(ss.messages):
+for i, m in enumerate(ss.messages if topic != "Quiz" else []):
     is_user = m["role"] == "user"
-    with st.chat_message(m["role"], avatar=icon if not is_user else ":material/person:"):
+    with st.chat_message(m["role"], avatar=icon if not is_user else "user"):
         if is_user and m.get("reply_to"):
             st.markdown(
                 f'<div class="reply-ref">Replying to: &ldquo;{html.escape(m["reply_to"])}&rdquo;</div>',
@@ -682,76 +936,33 @@ for i, m in enumerate(ss.messages):
                     unsafe_allow_html=True,
                 )
             render_user_copy_bar(m["content"])
-        elif not ss.generate:
-            prev_q = ss.messages[i - 1]["content"] if i > 0 and ss.messages[i - 1]["role"] == "user" else ""
-            render_assistant_actions(i, m["content"], prev_q)
-
-            if not m.get("blocked"):
-                is_latest = i == last
-                snippet = _short_snippet(m["content"], 95)
-
-                if is_latest:
-                    followup_q = extract_followup(m["content"])
-                    st.markdown('<div class="followup-label">FOLLOW UP</div>', unsafe_allow_html=True)
-                    if followup_q and "quiz" not in followup_q.lower():
-                        with st.container(key="qa_ai_followup"):
-                            st.button(
-                                followup_q,
-                                key="qa_suggested",
-                                icon=":material/subdirectory_arrow_right:",
-                                on_click=queue,
-                                args=(f"Yes — {followup_q}",),
-                                use_container_width=True,
-                            )
-                    with st.container(key="qa_chips"):
-                        c1, c2, c3 = st.columns(3)
-                        c1.button("Show example", key="qa_ex", icon=":material/visibility:", on_click=queue,
-                                  args=("Show me one real-game example of that.",), use_container_width=True)
-                        c2.button("Explain simpler", key="qa_simple", icon=":material/lightbulb:", on_click=queue,
-                                  args=("Explain that again in simpler words.",), use_container_width=True)
-                        c3.button("Quiz me", key="qa_quiz", icon=":material/quiz:", on_click=start_quiz,
-                                  use_container_width=True)
-
-                    with st.container(key=f"followup_box_{i}"):
-                        with st.form(key=f"followup_form_{i}", clear_on_submit=True, border=False):
-                            fc1, fc2 = st.columns([5.2, 1.3], vertical_alignment="center")
-                            follow_val = fc1.text_input(
-                                "Reply or follow up",
-                                placeholder="Reply or ask a follow-up about this…",
-                                label_visibility="collapsed",
-                                key=f"followup_in_{i}",
-                            )
-                            sent = fc2.form_submit_button("Reply", icon=":material/send:", use_container_width=True)
-                        if sent and follow_val and follow_val.strip():
-                            queue(follow_val.strip())
-                            st.rerun()
-                else:
-                    is_open = ss.reply_idx == i
-                    with st.container(key=f"reply_toggle_{i}"):
-                        st.button(
-                            "Close reply" if is_open else "Reply",
-                            key=f"reply_btn_{i}",
-                            icon=":material/close:" if is_open else ":material/reply:",
-                            on_click=toggle_reply,
-                            args=(i,),
-                        )
-                    if is_open:
-                        with st.container(key=f"followup_box_{i}"):
-                            with st.form(key=f"followup_form_{i}", clear_on_submit=True, border=False):
-                                fc1, fc2 = st.columns([5.2, 1.3], vertical_alignment="center")
-                                follow_val = fc1.text_input(
-                                    "Reply to this answer",
-                                    placeholder="Ask a follow-up about this answer…",
-                                    label_visibility="collapsed",
-                                    key=f"followup_in_{i}",
-                                )
-                                sent = fc2.form_submit_button("Reply", icon=":material/send:", use_container_width=True)
-                            if sent and follow_val and follow_val.strip():
-                                queue(follow_val.strip(), reply_to=snippet)
-                                st.rerun()
+        elif not ss.generate and not m.get("blocked") and i == last:
+            followup_q = extract_followup(m["content"])
+            st.markdown('<div class="followup-label">FOLLOW UP</div>', unsafe_allow_html=True)
+            if followup_q and "quiz" not in followup_q.lower():
+                with st.container(key="qa_ai_followup"):
+                    st.button(
+                        followup_q,
+                        key="qa_suggested",
+                        icon=":material/subdirectory_arrow_right:",
+                        on_click=queue,
+                        args=(f"Yes — {followup_q}",),
+                        use_container_width=True,
+                    )
+            with st.container(key="qa_chips"):
+                c1, c2, c3 = st.columns(3)
+                c1.button("Show example", key="qa_ex", icon=":material/visibility:", on_click=queue,
+                          args=("Show me one real-game example of that.",), use_container_width=True)
+                c2.button("Explain simpler", key="qa_simple", icon=":material/lightbulb:", on_click=queue,
+                          args=("Explain that again in simpler words.",), use_container_width=True)
+                c3.button("Quiz me", key="qa_quiz", icon=":material/quiz:", on_click=start_quiz,
+                          use_container_width=True)
+    # Copy / paste / share icons + Reply button sit below the response card
+    if not is_user and not ss.generate:
+        render_message_tools(i, m)
 
 # ---------- generate ----------
-if ss.generate:
+if ss.generate and topic != "Quiz":
     ss.generate = False
     client = get_client()
     token = defenses.new_token()

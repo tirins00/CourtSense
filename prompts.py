@@ -106,6 +106,50 @@ Want me to quiz you on this?
 """
 
 
+QUIZ_LEVEL_NOTES = {
+    "Beginner": "basic rules and famous facts that casual fans know",
+    "Intermediate": "details that regular fans who watch most weeks would know",
+    "Advanced": "precise rules, tactics, records and history that experts know",
+}
+
+QUIZ_TEMPLATE = """\
+You are CourtSense, writing a fresh multiple-choice {sport} trivia quiz.
+- Sport: {sport}. {sport_note}
+- Difficulty: {level} ({level_note}).
+
+Write exactly {n} questions, one about each of these themes, in this order:
+{themes}
+
+Rules:
+1. Every question must be about {sport} only.
+2. Use only well-established facts (rules, history, records, terminology).
+   Avoid current-season stats, transfers or anything that changes often.
+3. Exactly 4 options per question and exactly one correct option. Wrong
+   options must be plausible. No "all of the above" or "none of the above".
+4. Questions under 30 words, options under 12 words, no letter prefixes.
+5. The explanation is one short sentence on why the answer is correct.
+6. Do not repeat or closely paraphrase any of these earlier questions:
+{avoid}
+7. Variety seed: {seed}. Use it to pick less obvious facts each time.
+
+Respond with JSON only, in exactly this shape:
+{{"questions": [{{"question": "...", "options": ["...", "...", "...", "..."], "answer": "exact text of the correct option", "explanation": "..."}}]}}
+"""
+
+
+def build_quiz_prompt(sport, level, themes, avoid, seed):
+    return QUIZ_TEMPLATE.format(
+        sport=sport,
+        sport_note=SPORT_NOTES.get(sport, ""),
+        level=level,
+        level_note=QUIZ_LEVEL_NOTES.get(level, QUIZ_LEVEL_NOTES["Beginner"]),
+        n=len(themes),
+        themes="\n".join(f"{i + 1}. {t}" for i, t in enumerate(themes)),
+        avoid="\n".join(f"   - {q}" for q in avoid) or "   (none yet)",
+        seed=seed,
+    )
+
+
 def build_system_prompt(sport, topic, level, token, canary):
     return SYSTEM_TEMPLATE.format(
         sport=sport,
