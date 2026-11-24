@@ -35,7 +35,12 @@ st.set_page_config(
 SPORTS = ["Basketball", "Volleyball", "Football"]
 TOPICS = ["Rules", "Strategy", "Stats", "Quiz"]
 LEVELS = ["Beginner", "Intermediate", "Advanced"]
-MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+MODELS = [
+    "llama-3.3-70b-versatile",
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+    "qwen/qwen3-32b",
+]
 TOPIC_ICONS = {
     "Rules": ":material/gavel:",
     "Strategy": ":material/schema:",
@@ -118,6 +123,7 @@ ss.setdefault("quizzes", {})       # sport -> active quiz state
 ss.setdefault("quiz_pending", {})  # sport -> True when a new quiz should be generated
 ss.setdefault("quiz_error", {})    # sport -> last generation error
 ss.setdefault("quiz_seen", {})     # sport -> recent question texts (avoid repeats)
+ss.setdefault("unavailable_models", set())  # models that returned 404 model_not_found
 
 
 sport = ss.sport
@@ -554,20 +560,35 @@ def generate_quiz(n=QUIZ_LEN):
     themes = random.sample(QUIZ_THEMES[sport], k=min(n, len(QUIZ_THEMES[sport])))
     seen = ss.quiz_seen.setdefault(sport, [])
     prompt = build_quiz_prompt(sport, level, themes, seen[-25:], random.randint(10000, 99999))
-    kwargs = dict(
-        model=model,
-        temperature=max(0.9, temperature),
-        max_tokens=2000,
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": f"Write {n} new {sport} quiz questions as JSON."},
-        ],
-    )
     client = get_client()
-    try:
-        resp = client.chat.completions.create(response_format={"type": "json_object"}, **kwargs)
-    except Exception:
-        resp = client.chat.completions.create(**kwargs)  # model without JSON mode
+    resp = None
+    last_err = None
+    for cand_model in _candidate_models(model, model_options):
+        kwargs = dict(
+            model=cand_model,
+            temperature=max(0.9, temperature),
+            max_tokens=2000,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": f"Write {n} new {sport} quiz questions as JSON."},
+            ],
+        )
+        try:
+            try:
+                resp = client.chat.completions.create(response_format={"type": "json_object"}, **kwargs)
+            except Exception as e:
+                if _is_model_not_found(e):
+                    raise
+                resp = client.chat.completions.create(**kwargs)  # model without JSON mode
+            break
+        except Exception as e:
+            if _is_model_not_found(e):
+                ss.unavailable_models.add(cand_model)
+                last_err = e
+                continue
+            raise
+    if resp is None:
+        raise last_err or RuntimeError("No accessible Groq chat model found for this API key.")
     questions = parse_quiz(resp.choices[0].message.content, n)
     seen.extend(q["question"] for q in questions)
     del seen[:-60]
@@ -613,20 +634,47 @@ def get_vb_key():
         return os.environ.get("API_SPORTS_KEY")
 
 
+def _is_model_not_found(exc):
+    msg = str(exc).lower()
+    return type(exc).__name__ == "NotFoundError" or "model_not_found" in msg or "does not exist" in msg
+
+
+def _candidate_models(selected, options):
+    seen, out = set(), []
+    for m in [selected, *options, *MODELS]:
+        if m and m not in seen and m not in ss.unavailable_models:
+            seen.add(m)
+            out.append(m)
+    return out
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
-def list_chat_models(_client):
-    """Ask Groq which chat models this key can use right now."""
-    skip = ("whisper", "tts", "guard", "compound", "embed", "orpheus", "safeguard")
+def _list_chat_models_cached(_client):
+    """Ask Groq which active chat models this key can use right now."""
+    skip = ("whisper", "tts", "guard", "compound", "embed", "orpheus", "safeguard", "prompt-guard")
+    models = _client.models.list().data
+    ids = []
+    for m in models:
+        extra = getattr(m, "model_extra", None) or {}
+        if extra.get("active") is False or getattr(m, "active", True) is False:
+            continue
+        if any(k in m.id.lower() for k in skip):
+            continue
+        ids.append(m.id)
+    return sorted(ids)
+
+
+def list_chat_models(client):
     try:
-        ids = sorted(m.id for m in _client.models.list().data)
+        ids = _list_chat_models_cached(client)
     except Exception:
-        return MODELS
-    ids = [i for i in ids if not any(k in i.lower() for k in skip)]
-    return ids or MODELS
+        ids = list(MODELS)
+    usable = [i for i in ids if i not in ss.unavailable_models]
+    return usable or list(MODELS)
 
 
 def default_model_index(options):
-    for pref in ("llama-3.3-70b", "llama-3.1-8b", "qwen", "llama", "70b", "120b", "8b"):
+    for pref in ("llama-3.3-70b", "gpt-oss-120b", "gpt-oss-20b", "qwen", "llama-4", "llama", "70b", "120b", "20b"):
         for i, name in enumerate(options):
             if pref in name.lower():
                 return i
@@ -814,6 +862,8 @@ with st.sidebar:
     )
     level = st.radio("Detail level", LEVELS, key="level")
     model_options = list_chat_models(get_client())
+    if ss.get("model") not in model_options:
+        ss.pop("model", None)
     model = st.selectbox("Model", model_options, index=default_model_index(model_options), key="model")
     temperature = st.slider("Temperature", 0.0, 1.0, 0.4, 0.1, key="temp",
                             help="Lower is more consistent. Higher is more varied.")
@@ -992,16 +1042,32 @@ if ss.generate and topic != "Quiz":
             last_user = ss.messages[-1]["content"].lower()
             topic_now = "Quiz" if "quiz" in last_user else topic
             live_data = None
+            active_model = model
             if topic_now == "Stats" or (topic_now != "Quiz" and stats.HINT.search(last_user)):
                 with st.spinner("Fetching live stats…"):
                     context = "\n".join(f"{m['role'].capitalize()}: {m['content'][:250]}" for m in ss.messages[-4:-1])
-                    route = stats.route_question(client, sport, ss.messages[-1]["content"], model, context=context)
+                    route = stats.route_question(client, sport, ss.messages[-1]["content"], active_model, context=context)
                     live_data = stats.fetch_live_data(sport, route, get_vb_key())
-            stream = client.chat.completions.create(
-                model=model, temperature=temperature,
-                max_tokens=900 if live_data else 500, stream=True,
-                messages=build_messages(topic_now, level, token, live_data),
-            )
+            msgs = build_messages(topic_now, level, token, live_data)
+            stream = None
+            last_err = None
+            for cand_model in _candidate_models(active_model, model_options):
+                try:
+                    stream = client.chat.completions.create(
+                        model=cand_model, temperature=temperature,
+                        max_tokens=900 if live_data else 500, stream=True,
+                        messages=msgs,
+                    )
+                    active_model = cand_model
+                    break
+                except Exception as e:
+                    if _is_model_not_found(e):
+                        ss.unavailable_models.add(cand_model)
+                        last_err = e
+                        continue
+                    raise
+            if stream is None:
+                raise last_err or RuntimeError("No accessible Groq chat model found for this API key.")
             for chunk in stream:
                 reply += chunk.choices[0].delta.content or ""
                 reply, stop = trim_runaway(reply)
