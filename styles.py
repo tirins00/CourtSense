@@ -131,6 +131,8 @@ BASE = {
         "input-btn-disabled-fg": "#9A9386",
         "input-chip-bg": "#EAE4D8",
         "bottom-fade": "linear-gradient(180deg, rgba(243, 239, 231, 0) 0%, rgba(243, 239, 231, 0.94) 30%, #F3EFE7 100%)",
+        "warn-ink": "#92400E",
+        "err-ink": "#991B1B",
         "card-shadow": "0 1px 2px rgba(22, 21, 19, 0.05)",
         "card-shadow-hover": "0 6px 18px rgba(22, 21, 19, 0.09)",
     },
@@ -153,6 +155,8 @@ BASE = {
         "input-btn-disabled-fg": "#5A5E66",
         "input-chip-bg": "#22252B",
         "bottom-fade": "linear-gradient(180deg, rgba(14, 15, 17, 0) 0%, rgba(14, 15, 17, 0.94) 30%, #0E0F11 100%)",
+        "warn-ink": "#FBBF24",
+        "err-ink": "#FCA5A5",
         "card-shadow": "0 1px 3px rgba(0, 0, 0, 0.35)",
         "card-shadow-hover": "0 8px 24px rgba(0, 0, 0, 0.55)",
     },
@@ -1918,6 +1922,117 @@ div[role="dialog"] button[aria-label="Close"] svg {
   padding-bottom: 1.35rem !important;
 }
 
+[data-testid="stBottomBlockContainer"] [data-testid="stVerticalBlock"] {
+  gap: 0.45rem !important;
+}
+
+.stApp:has([data-testid="stBottom"] .cs-quota-banner) .block-container {
+  padding-bottom: 13rem;
+}
+
+/* --- Prompt Quota Warning & Limit Banners --- */
+.cs-quota-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 6px;
+  padding: 9px 14px;
+  font-size: 0.9rem;
+  line-height: 1.42;
+  color: var(--ink);
+  box-shadow: var(--card-shadow);
+  margin: 0;
+}
+
+.cs-quota-banner.is-warn {
+  background: linear-gradient(0deg, rgba(217, 119, 6, 0.13), rgba(217, 119, 6, 0.13)), var(--panel);
+  border: 1.5px solid rgba(217, 119, 6, 0.55);
+  border-left: 4px solid #D97706;
+}
+
+.cs-quota-banner.is-error {
+  background: linear-gradient(0deg, rgba(220, 38, 38, 0.12), rgba(220, 38, 38, 0.12)), var(--panel);
+  border: 1.5px solid rgba(220, 38, 38, 0.55);
+  border-left: 4px solid #DC2626;
+}
+
+.cs-quota-badge {
+  display: inline-block;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid;
+}
+
+.cs-quota-banner.is-warn .cs-quota-badge {
+  color: var(--warn-ink);
+  border-color: rgba(217, 119, 6, 0.55);
+  background: rgba(217, 119, 6, 0.14);
+}
+
+.cs-quota-banner.is-error .cs-quota-badge {
+  color: var(--err-ink);
+  border-color: rgba(220, 38, 38, 0.55);
+  background: rgba(220, 38, 38, 0.14);
+}
+
+.cs-quota-text {
+  min-width: 0;
+  color: var(--ink);
+}
+
+.cs-quota-banner.is-warn strong {
+  color: var(--warn-ink);
+}
+
+.cs-quota-banner.is-error strong {
+  color: var(--err-ink);
+}
+
+.cs-quota-banner.is-sidebar {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  margin: 6px 0 2px;
+}
+
+.cs-quota-banner.is-quiz {
+  margin: 0 0 12px;
+}
+
+/* Theme-aware Toast notifications */
+[data-testid="stToast"] {
+  background-color: var(--panel) !important;
+  color: var(--ink) !important;
+  border: 1.5px solid var(--input-border) !important;
+  box-shadow: var(--card-shadow-hover) !important;
+}
+
+[data-testid="stToast"] p,
+[data-testid="stToast"] span {
+  color: var(--ink) !important;
+}
+
+/* Disabled prompt action buttons at quota limit */
+.stApp .st-key-starters button:disabled,
+.stApp .st-key-qa_chips button:disabled,
+.st-key-qa_ai_followup button:disabled,
+.st-key-startquiz button:disabled,
+.st-key-quiz_again button:disabled,
+[class*="st-key-reply_btn_"] button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 [data-testid="stChatInput"] {
   background: transparent !important;
   border: none !important;
@@ -2349,6 +2464,14 @@ div[role="dialog"] button[aria-label="Close"] svg {
     padding-left: 0.85rem !important;
     padding-right: 0.85rem !important;
     padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .stApp:has([data-testid="stBottom"] .cs-quota-banner) .block-container {
+    padding-bottom: 11.5rem;
+  }
+  .cs-quota-banner {
+    padding: 8px 11px;
+    font-size: 0.84rem;
+    gap: 8px;
   }
   [data-testid="stChatInput"] > div {
     border-radius: 15px !important;
