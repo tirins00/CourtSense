@@ -22,11 +22,15 @@ from groq import Groq
 import defenses
 import stats
 from prompts import build_quiz_prompt, build_system_prompt
-from styles import get_css
+from styles import brand_logo_svg, get_css
 
 _SUPPORTS_INLINE_JS = "unsafe_allow_javascript" in inspect.signature(st.html).parameters
 
-st.set_page_config(page_title="CourtSense", page_icon=":material/sports_basketball:", layout="centered")
+st.set_page_config(
+    page_title="CourtSense",
+    page_icon=brand_logo_svg(st.session_state.get("sport", "Basketball"), st.session_state.get("dark", False)),
+    layout="centered",
+)
 
 SPORTS = ["Basketball", "Volleyball", "Football"]
 TOPICS = ["Rules", "Strategy", "Stats", "Quiz"]
@@ -880,7 +884,13 @@ if text or files:
 with st.container(key="hero"):
     with st.container(key="hero_top"):
         c1, c2 = st.columns([3, 1.4], vertical_alignment="center")
-        c1.markdown('<div class="wordmark-wrap"><span class="wordmark-badge">SPORTS INTEL</span><span class="wordmark">CourtSense</span></div>', unsafe_allow_html=True)
+        c1.markdown(
+            '<div class="wordmark-wrap">'
+            '<span class="brand-logo" role="img" aria-label="CourtSense logo"></span>'
+            '<span class="wordmark">CourtSense</span>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         c2.toggle("Dark mode", key="dark")
     st.markdown(f'<div class="hero-title">{sport}</div>'
                 f'<div class="hero-sub"><span class="sub-pill">{topic}</span><span class="sub-text">{TAGLINES[topic]}</span></div>',
@@ -967,8 +977,8 @@ for i, m in enumerate(ss.messages if topic != "Quiz" else []):
                           args=("Explain that again in simpler words.",), use_container_width=True)
                 c3.button("Quiz me", key="qa_quiz", icon=":material/quiz:", on_click=start_quiz,
                           use_container_width=True)
-    # Copy / paste / share icons + Reply button sit below the response card
-    if not is_user and not ss.generate:
+    # Copy / paste / share icons + Reply button sit below each completed response card
+    if not is_user:
         render_message_tools(i, m)
 
 # ---------- generate ----------

@@ -14,9 +14,13 @@ from urllib.parse import quote
 THEMES = {
     "Basketball": {
         "light": {
-            "hero-start": "#1A1411",
-            "hero-end": "#261B15",
-            "hero": "#1A1411",
+            "hero-start": "#D94F14",
+            "hero-end": "#8F2D08",
+            "hero": "#C2410C",
+            "hero-scrim": "rgba(122, 35, 5, 0.72)",
+            "hero-scrim-mid": "rgba(122, 35, 5, 0.26)",
+            "bg-glow": "rgba(201, 74, 18, 0.11)",
+            "bg-glow-soft": "rgba(201, 74, 18, 0.06)",
             "accent": "#C94A12",
             "accent-hover": "#A83B0B",
             "accent-edge": "#8C3008",
@@ -25,9 +29,13 @@ THEMES = {
             "bubble-user": "#C94A12",
         },
         "dark": {
-            "hero-start": "#15110E",
-            "hero-end": "#221813",
-            "hero": "#15110E",
+            "hero-start": "#B83E0C",
+            "hero-end": "#661F05",
+            "hero": "#9A3412",
+            "hero-scrim": "rgba(74, 22, 4, 0.74)",
+            "hero-scrim-mid": "rgba(74, 22, 4, 0.28)",
+            "bg-glow": "rgba(232, 93, 26, 0.14)",
+            "bg-glow-soft": "rgba(232, 93, 26, 0.07)",
             "accent": "#E85D1A",
             "accent-hover": "#F27130",
             "accent-edge": "#9E3B0C",
@@ -38,9 +46,13 @@ THEMES = {
     },
     "Volleyball": {
         "light": {
-            "hero-start": "#101929",
-            "hero-end": "#17253D",
-            "hero": "#101929",
+            "hero-start": "#1D56C4",
+            "hero-end": "#102E78",
+            "hero": "#1846A3",
+            "hero-scrim": "rgba(14, 38, 102, 0.72)",
+            "hero-scrim-mid": "rgba(14, 38, 102, 0.26)",
+            "bg-glow": "rgba(27, 75, 158, 0.11)",
+            "bg-glow-soft": "rgba(27, 75, 158, 0.06)",
             "accent": "#1B4B9E",
             "accent-hover": "#153B7D",
             "accent-edge": "#0F2B5C",
@@ -49,9 +61,13 @@ THEMES = {
             "bubble-user": "#1B4B9E",
         },
         "dark": {
-            "hero-start": "#0D1524",
-            "hero-end": "#15233A",
-            "hero": "#0D1524",
+            "hero-start": "#17429E",
+            "hero-end": "#0C2157",
+            "hero": "#14357D",
+            "hero-scrim": "rgba(10, 26, 72, 0.76)",
+            "hero-scrim-mid": "rgba(10, 26, 72, 0.30)",
+            "bg-glow": "rgba(59, 119, 232, 0.15)",
+            "bg-glow-soft": "rgba(59, 119, 232, 0.07)",
             "accent": "#3B77E8",
             "accent-hover": "#558DF0",
             "accent-edge": "#1F4EA6",
@@ -62,9 +78,13 @@ THEMES = {
     },
     "Football": {
         "light": {
-            "hero-start": "#0E1F17",
-            "hero-end": "#142D22",
-            "hero": "#0E1F17",
+            "hero-start": "#117A4B",
+            "hero-end": "#08472A",
+            "hero": "#0E663E",
+            "hero-scrim": "rgba(7, 56, 33, 0.72)",
+            "hero-scrim-mid": "rgba(7, 56, 33, 0.26)",
+            "bg-glow": "rgba(20, 108, 67, 0.11)",
+            "bg-glow-soft": "rgba(20, 108, 67, 0.06)",
             "accent": "#146C43",
             "accent-hover": "#0F5534",
             "accent-edge": "#0A3D25",
@@ -73,9 +93,13 @@ THEMES = {
             "bubble-user": "#146C43",
         },
         "dark": {
-            "hero-start": "#0B1912",
-            "hero-end": "#12291E",
-            "hero": "#0B1912",
+            "hero-start": "#0D613B",
+            "hero-end": "#05331E",
+            "hero": "#0A4F30",
+            "hero-scrim": "rgba(5, 40, 23, 0.76)",
+            "hero-scrim-mid": "rgba(5, 40, 23, 0.30)",
+            "bg-glow": "rgba(34, 163, 102, 0.14)",
+            "bg-glow-soft": "rgba(34, 163, 102, 0.07)",
             "accent": "#22A366",
             "accent-hover": "#2BB876",
             "accent-edge": "#126B41",
@@ -133,43 +157,223 @@ BASE = {
     },
 }
 
-# Court blueprint artwork - refined vectors with soft luminous stroke
-_STROKE = "fill='none' stroke='white' stroke-width='2.6' stroke-opacity='0.24' stroke-linecap='round' stroke-linejoin='round'"
+# Court / pitch blueprint artwork - sport-specific regulation markings sized for the landscape option card
+_STROKE = "fill='none' stroke='white' stroke-width='2.4' stroke-opacity='0.38' stroke-linecap='round' stroke-linejoin='round'"
 ART = {
     "Basketball": (
-        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 470'><g " + _STROKE + ">"
-        "<rect x='12' y='12' width='476' height='446' rx='6'/>"
-        "<rect x='170' y='12' width='160' height='190'/>"
-        "<circle cx='250' cy='202' r='62'/>"
-        "<circle cx='250' cy='62' r='10'/>"
-        "<path d='M220 40H280M200 12V12'/>"
-        "<path d='M42 12V140A208 208 0 0 0 458 140V12'/>"
-        "<path d='M210 62A40 40 0 0 0 290 62'/>"
-        "<path d='M190 458A60 60 0 0 1 310 458'/>"
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 560 300'>"
+        # Subtle hardwood court plank texture
+        "<g stroke='white' stroke-width='1' stroke-opacity='0.08'>"
+        "<path d='M18 46H542M18 81H542M18 115H542M18 150H542M18 185H542M18 219H542M18 254H542'/>"
+        "</g>"
+        # Shaded painted keys (free-throw lanes)
+        "<rect x='18' y='105.5' width='106' height='89' fill='white' fill-opacity='0.09'/>"
+        "<rect x='436' y='105.5' width='106' height='89' fill='white' fill-opacity='0.10'/>"
+        "<circle cx='280' cy='150' r='34' fill='white' fill-opacity='0.06'/>"
+        "<g " + _STROKE + ">"
+        # Outer boundary & half-court line
+        "<rect x='18' y='12' width='524' height='276' rx='4'/>"
+        "<path d='M280 12V288'/>"
+        "<circle cx='280' cy='150' r='34'/>"
+        "<circle cx='280' cy='150' r='10'/>"
+        # Right half-court: paint, free-throw circle (solid + dashed), lane hashes, 3pt arc, backboard & rim
+        "<rect x='436' y='105.5' width='106' height='89'/>"
+        "<path d='M436 116.5A33.5 33.5 0 0 0 436 183.5'/>"
+        "<path d='M436 116.5A33.5 33.5 0 0 1 436 183.5' stroke-dasharray='6 6'/>"
+        "<path d='M456 99V105.5M474 99V105.5M492 99V105.5M504 98V105.5"
+        "M456 194.5V201M474 194.5V201M492 194.5V201M504 194.5V202'/>"
+        "<path d='M542 29H460A132 132 0 0 0 460 271H542'/>"
+        "<path d='M520 133V167' stroke-width='3'/>"
+        "<circle cx='513' cy='150' r='6'/>"
+        "<path d='M513 128A22 22 0 0 0 513 172'/>"
+        # Left half-court (mirrored)
+        "<rect x='18' y='105.5' width='106' height='89'/>"
+        "<path d='M124 116.5A33.5 33.5 0 0 1 124 183.5'/>"
+        "<path d='M124 116.5A33.5 33.5 0 0 0 124 183.5' stroke-dasharray='6 6'/>"
+        "<path d='M104 99V105.5M86 99V105.5M68 99V105.5M56 98V105.5"
+        "M104 194.5V201M86 194.5V201M68 194.5V201M56 194.5V202'/>"
+        "<path d='M18 29H100A132 132 0 0 1 100 271H18'/>"
+        "<path d='M40 133V167' stroke-width='3'/>"
+        "<circle cx='47' cy='150' r='6'/>"
+        "<path d='M47 128A22 22 0 0 1 47 172'/>"
         "</g></svg>"
     ),
     "Volleyball": (
-        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 520 270'><g " + _STROKE + ">"
-        "<rect x='12' y='12' width='496' height='246' rx='6'/>"
-        "<path d='M260 -10V280' stroke-width='5.5' stroke-opacity='0.36'/>"
-        "<path d='M178 12V258M342 12V258'/>"
-        "<path d='M178 135H342' stroke-dasharray='8 10'/>"
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 560 300'>"
+        # Two-tone indoor Taraflex attack zone shading (3-meter front zones)
+        "<rect x='36' y='28' width='488' height='244' fill='white' fill-opacity='0.04'/>"
+        "<rect x='199' y='28' width='162' height='244' fill='white' fill-opacity='0.11'/>"
+        "<g " + _STROKE + ">"
+        # Outer sidelines & endlines
+        "<rect x='36' y='28' width='488' height='244' rx='3'/>"
+        # 3-meter attack lines (solid inside + official FIVB dashed sideline extensions)
+        "<path d='M199 28V272M361 28V272'/>"
+        "<path d='M199 7V26M199 274V293M361 7V26M361 274V293' stroke-dasharray='5 5'/>"
+        # Service zone tick marks behind endlines
+        "<path d='M22 28H30M22 272H30M530 28H538M530 272H538'/>"
+        # Center net line, net mesh ticks, antennae & net posts
+        "<path d='M280 12V288' stroke-width='4.6' stroke-opacity='0.52'/>"
+        "<path d='M275 38H285M275 66H285M275 94H285M275 122H285M275 150H285"
+        "M275 178H285M275 206H285M275 234H285M275 262H285' stroke-width='1.5' stroke-opacity='0.34'/>"
+        "<circle cx='280' cy='12' r='5' fill='white' fill-opacity='0.45'/>"
+        "<circle cx='280' cy='288' r='5' fill='white' fill-opacity='0.45'/>"
+        "<circle cx='280' cy='28' r='2.8' fill='white' fill-opacity='0.55' stroke='none'/>"
+        "<circle cx='280' cy='272' r='2.8' fill='white' fill-opacity='0.55' stroke='none'/>"
         "</g></svg>"
     ),
     "Football": (
-        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 520 340'><g " + _STROKE + ">"
-        "<rect x='12' y='12' width='496' height='316' rx='6'/>"
-        "<path d='M260 12V328'/>"
-        "<circle cx='260' cy='170' r='48'/>"
-        "<rect x='12' y='95' width='86' height='150'/>"
-        "<rect x='422' y='95' width='86' height='150'/>"
-        "<rect x='12' y='140' width='34' height='60'/>"
-        "<rect x='474' y='140' width='34' height='60'/>"
-        "<path d='M98 132A48 48 0 0 1 98 208'/>"
-        "<path d='M422 132A48 48 0 0 0 422 208'/>"
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 560 300'>"
+        # Alternating mowed stadium grass pitch stripes
+        "<g fill='white' fill-opacity='0.055'>"
+        "<rect x='24' y='16' width='51.2' height='268'/>"
+        "<rect x='126.4' y='16' width='51.2' height='268'/>"
+        "<rect x='228.8' y='16' width='51.2' height='268'/>"
+        "<rect x='331.2' y='16' width='51.2' height='268'/>"
+        "<rect x='433.6' y='16' width='51.2' height='268'/>"
+        "</g>"
+        "<g " + _STROKE + ">"
+        # Touchlines, goal lines & halfway line
+        "<rect x='24' y='16' width='512' height='268' rx='3'/>"
+        "<path d='M280 16V284'/>"
+        # Center circle & kick-off spot
+        "<circle cx='280' cy='150' r='44'/>"
+        "<circle cx='280' cy='150' r='3.5' fill='white' fill-opacity='0.5' stroke='none'/>"
+        # Corner quarter-circle arcs
+        "<path d='M24 30A14 14 0 0 0 38 16M522 16A14 14 0 0 0 536 30"
+        "M24 270A14 14 0 0 1 38 284M522 284A14 14 0 0 1 536 270'/>"
+        # Penalty areas (18-yard boxes) & goal areas (6-yard boxes)
+        "<rect x='24' y='71' width='86' height='158'/>"
+        "<rect x='450' y='71' width='86' height='158'/>"
+        "<rect x='24' y='112' width='32' height='76'/>"
+        "<rect x='504' y='112' width='32' height='76'/>"
+        # Goal frames
+        "<rect x='14' y='132' width='10' height='36'/>"
+        "<rect x='536' y='132' width='10' height='36'/>"
+        # Penalty spots & penalty arcs ("D")
+        "<circle cx='82' cy='150' r='3' fill='white' fill-opacity='0.5' stroke='none'/>"
+        "<circle cx='478' cy='150' r='3' fill='white' fill-opacity='0.5' stroke='none'/>"
+        "<path d='M110 116A44 44 0 0 1 110 184'/>"
+        "<path d='M450 116A44 44 0 0 0 450 184'/>"
         "</g></svg>"
     ),
 }
+
+# Compact sport-specific court markings for each sport option button
+_BTN_ART_SHAPES = {
+    "Basketball": (
+        "<path d='M118 4H86A42 42 0 0 0 86 76H118'/>"
+        "<rect x='84' y='22' width='34' height='36'/>"
+        "<path d='M84 26A14 14 0 0 0 84 54'/>"
+        "<circle cx='108' cy='40' r='3.5'/>"
+    ),
+    "Volleyball": (
+        "<rect x='16' y='8' width='98' height='64' rx='2'/>"
+        "<path d='M65 2V78' stroke-width='3'/>"
+        "<path d='M46 8V72M84 8V72'/>"
+        "<path d='M46 3V7M46 73V77M84 3V7M84 73V77' stroke-dasharray='2 2'/>"
+    ),
+    "Football": (
+        "<rect x='14' y='8' width='100' height='64' rx='2'/>"
+        "<path d='M64 8V72'/>"
+        "<circle cx='64' cy='40' r='14'/>"
+        "<rect x='92' y='22' width='22' height='36'/>"
+        "<path d='M92 31A12 12 0 0 0 92 49'/>"
+    ),
+}
+
+
+def _sport_btn_bg(sport_name, stroke, opacity):
+    svg = (
+        f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 80' fill='none' "
+        f"stroke='{stroke}' stroke-width='2' stroke-opacity='{opacity}' "
+        f"stroke-linecap='round' stroke-linejoin='round'>"
+        f"{_BTN_ART_SHAPES[sport_name]}</svg>"
+    )
+    return f'url("data:image/svg+xml,{quote(svg)}")'
+
+
+# Seamless tactical playbook & sports motifs for the full-page backdrop
+_PAGE_BG_SHAPES = {
+    "Basketball": (
+        # Basketball with curved panel seams
+        "<circle cx='78' cy='82' r='26'/>"
+        "<path d='M52 82H104M78 56V108'/>"
+        "<path d='M60 63A24 24 0 0 1 60 101M96 63A24 24 0 0 0 96 101'/>"
+        # Pick-and-roll chalkboard play (O's, defender X, screen T-bar, cut arrow & pass)
+        "<circle cx='216' cy='112' r='7'/><circle cx='286' cy='116' r='7'/>"
+        "<path d='M244 80L256 92M256 80L244 92'/>"
+        "<path d='M220 102Q244 52 294 64'/><path d='M286 58L296 64L287 72'/>"
+        "<path d='M225 113L276 115' stroke-dasharray='5 5'/>"
+        "<path d='M254 106L266 86M258 82L274 90'/>"
+        # Mini half-court key & 3-point arc
+        "<path d='M42 292H144'/><rect x='74' y='246' width='38' height='46'/>"
+        "<path d='M74 246A19 19 0 0 1 112 246'/>"
+        "<path d='M48 292V264A45 45 0 0 1 138 264V292'/>"
+        "<circle cx='93' cy='278' r='4'/>"
+        # Backboard, rim & net
+        "<rect x='244' y='214' width='56' height='36' rx='2'/>"
+        "<rect x='262' y='230' width='20' height='14'/>"
+        "<path d='M258 244H286' stroke-width='2.2'/>"
+        "<path d='M260 244L265 272H279L284 244M263 254L281 264M281 254L263 264'/>"
+        # Tactical alignment ticks
+        "<path d='M174 180H186M180 174V186M10 180H22M16 174V186M174 16H186M180 10V22'/>"
+    ),
+    "Volleyball": (
+        # Volleyball with curved 6-panel seams
+        "<circle cx='78' cy='82' r='26'/>"
+        "<path d='M55 70Q78 62 101 70M53 88Q78 80 103 88M78 56Q90 82 78 108M66 59Q72 82 64 104'/>"
+        # Set-and-spike rotation play diagram
+        "<circle cx='216' cy='112' r='7'/><circle cx='258' cy='72' r='7'/><circle cx='294' cy='112' r='7'/>"
+        "<path d='M252 110L264 122M264 110L252 122'/>"
+        "<path d='M222 106Q238 78 250 74' stroke-dasharray='5 5'/>"
+        "<path d='M266 74Q288 78 302 102'/><path d='M294 98L303 104L304 93'/>"
+        # Net mesh, posts & antennae
+        "<path d='M40 232V292M146 232V292' stroke-width='2.2'/>"
+        "<rect x='40' y='238' width='106' height='26'/>"
+        "<path d='M40 247H146M40 255H146M58 238V264M76 238V264M94 238V264M112 238V264M130 238V264'/>"
+        "<path d='M48 222V238M138 222V238' stroke-dasharray='3 3'/>"
+        # Mini court with 3m attack lines & net
+        "<rect x='228' y='224' width='92' height='54' rx='2'/>"
+        "<path d='M274 218V284' stroke-width='2.2'/>"
+        "<path d='M256 224V278M292 224V278'/>"
+        "<path d='M256 219V223M256 279V283M292 219V223M292 279V283' stroke-dasharray='2 2'/>"
+        # Tactical alignment ticks
+        "<path d='M174 180H186M180 174V186M10 180H22M16 174V186M174 16H186M180 10V22'/>"
+    ),
+    "Football": (
+        # Classic pentagon-panel football
+        "<circle cx='78' cy='82' r='26'/>"
+        "<polygon points='78,72 87,79 84,90 72,90 69,79'/>"
+        "<path d='M78 72V56M87 79L103 74M84 90L94 103M72 90L62 103M69 79L53 74'/>"
+        # Tactical formation & overlapping wing run
+        "<circle cx='214' cy='112' r='7'/><circle cx='252' cy='72' r='7'/><circle cx='286' cy='114' r='7'/>"
+        "<path d='M246 102L258 114M258 102L246 114'/>"
+        "<path d='M222 106L246 79' stroke-dasharray='5 5'/>"
+        "<path d='M286 104Q298 68 272 54'/><path d='M279 51L270 54L276 62'/>"
+        # Goal frame, net & penalty area
+        "<path d='M42 238H144'/><rect x='72' y='224' width='42' height='14'/>"
+        "<path d='M82 224V238M93 224V238M104 224V238M72 231H114'/>"
+        "<rect x='54' y='238' width='78' height='40'/><rect x='72' y='238' width='42' height='18'/>"
+        "<circle cx='93' cy='265' r='2'/>"
+        "<path d='M77 278A22 22 0 0 0 109 278'/>"
+        # Center circle & corner flag
+        "<path d='M232 252H318'/><circle cx='275' cy='252' r='24'/><circle cx='275' cy='252' r='2.5'/>"
+        "<path d='M304 218V238M304 218L318 223L304 228'/>"
+        # Tactical alignment ticks
+        "<path d='M174 180H186M180 174V186M10 180H22M16 174V186M174 16H186M180 10V22'/>"
+    ),
+}
+
+
+def _page_bg_tile(sport_name, stroke, opacity):
+    shapes = _PAGE_BG_SHAPES.get(sport_name, _PAGE_BG_SHAPES["Basketball"])
+    svg = (
+        f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 360 360' width='360' height='360' "
+        f"fill='none' stroke='{stroke}' stroke-width='1.55' stroke-opacity='{opacity}' "
+        f"stroke-linecap='round' stroke-linejoin='round'>"
+        f"{shapes}</svg>"
+    )
+    return f'url("data:image/svg+xml,{quote(svg)}")'
 
 FONT_URL = (
     "https://fonts.googleapis.com/css2?"
@@ -194,7 +398,7 @@ html, body, [class*="st-"] {
 }
 
 .stApp {
-  background: var(--bg);
+  background-color: var(--bg);
   color: var(--ink);
   font-family: var(--font-body);
   font-optical-sizing: auto;
@@ -233,7 +437,7 @@ header[data-testid="stHeader"] { background: transparent; }
 .block-container {
   max-width: 880px;
   padding-top: 1.2rem;
-  padding-bottom: 7.5rem;
+  padding-bottom: 8.5rem;
 }
 
 [data-testid="stSidebar"] {
@@ -255,49 +459,52 @@ hr {
 /* --- Hero Scoreboard Banner --- */
 .st-key-hero {
   background-color: var(--hero);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 20px 26px 10px;
   overflow: hidden;
   margin-bottom: 18px;
-  border: 1px solid rgba(255,255,255,0.08);
-  border-top: 3px solid var(--accent);
-  box-shadow: 0 10px 28px rgba(0,0,0,0.22);
+  border: 1px solid rgba(255,255,255,0.18);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.22);
   position: relative;
-  transition: border-color 0.25s ease;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
 }
 
 .st-key-hero [data-testid="stVerticalBlock"] {
   gap: 0.4rem;
 }
 
-/* Wordmark & Credential Badge */
+/* Brand Crest Logo & Wordmark */
 .wordmark-wrap {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 11px;
 }
 
-.wordmark-badge {
-  display: inline-flex;
-  align-items: center;
-  background: var(--accent);
-  border: none;
-  color: #FFFFFF;
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 3px 7px;
-  border-radius: 3px;
+.brand-logo {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.28));
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.brand-logo:hover {
+  transform: translateY(-1px) scale(1.04);
+  filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.36));
 }
 
 .wordmark {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.25rem;
-  letter-spacing: -0.02em;
-  color: #F4F1EA;
+  font-size: 1.32rem;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  color: #FFFFFF;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.24);
 }
 
 .hero-title {
@@ -308,6 +515,7 @@ hr {
   letter-spacing: -0.035em;
   color: #FFFFFF;
   margin-top: 8px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.22);
 }
 
 .stApp .hero-sub {
@@ -315,10 +523,11 @@ hr {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  color: rgba(244, 241, 234, 0.78);
+  color: rgba(255, 255, 255, 0.90);
   font-size: 0.96rem;
   font-weight: 500;
   margin: 8px 0 14px;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
 }
 
 .sub-text {
@@ -328,16 +537,16 @@ hr {
 .sub-pill {
   display: inline-block;
   flex-shrink: 0;
-  background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.18);
-  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  border-radius: 4px;
   padding: 2px 8px;
   font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.09em;
-  color: #F4F1EA;
+  color: #FFFFFF;
 }
 
 .st-key-hero_top [data-testid="stHorizontalBlock"] {
@@ -403,14 +612,19 @@ hr {
 
 .stApp .st-key-hero [class*="st-key-sp_"] button {
   width: 100%;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 5px;
-  min-height: 2.75rem;
-  padding: 0 0.8rem;
-  color: rgba(244, 241, 234, 0.88);
+  background-color: rgba(0, 0, 0, 0.22);
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+  background-size: auto 92%;
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  border-radius: 7px;
+  min-height: 2.85rem;
+  padding: 0 0.85rem;
+  color: rgba(255, 255, 255, 0.94);
   box-shadow: none;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
   cursor: pointer;
 }
 
@@ -420,16 +634,21 @@ hr {
 }
 
 .stApp .st-key-hero [class*="st-key-sp_"] button p {
-  color: rgba(244, 241, 234, 0.88);
+  color: rgba(255, 255, 255, 0.94);
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.94rem;
+  font-size: 0.95rem;
   letter-spacing: -0.01em;
 }
 
+.stApp .st-key-hero [class*="st-key-sp_"] button span[data-testid="stIconMaterial"] {
+  color: rgba(255, 255, 255, 0.94);
+}
+
 .stApp .st-key-hero [class*="st-key-sp_"] button:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.36);
+  background-color: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.62);
+  transform: translateY(-1px);
 }
 
 .stApp .st-key-hero [class*="st-key-sp_"] button:hover p {
@@ -440,7 +659,7 @@ hr {
 .st-key-topics {
   margin-top: 14px;
   padding-top: 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 .stApp .st-key-hero [class*="st-key-tp_"] button {
@@ -456,18 +675,23 @@ hr {
 }
 
 .stApp .st-key-hero [class*="st-key-tp_"] button p {
-  color: rgba(244, 241, 234, 0.65);
+  color: rgba(255, 255, 255, 0.78);
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 0.92rem;
   letter-spacing: 0.01em;
 }
 
-.stApp .st-key-hero [class*="st-key-tp_"] button:hover {
-  background: rgba(255, 255, 255, 0.05) !important;
+.stApp .st-key-hero [class*="st-key-tp_"] button span[data-testid="stIconMaterial"] {
+  color: rgba(255, 255, 255, 0.78);
 }
 
-.stApp .st-key-hero [class*="st-key-tp_"] button:hover p {
+.stApp .st-key-hero [class*="st-key-tp_"] button:hover {
+  background: rgba(255, 255, 255, 0.10) !important;
+}
+
+.stApp .st-key-hero [class*="st-key-tp_"] button:hover p,
+.stApp .st-key-hero [class*="st-key-tp_"] button:hover span[data-testid="stIconMaterial"] {
   color: #FFFFFF;
 }
 
@@ -596,65 +820,112 @@ hr {
   padding: 0 !important;
 }
 
-/* --- Chat Messages & Avatars (Editorial Briefing Sheets) --- */
-[data-testid="stChatMessage"] {
-  border-radius: 6px;
-  padding: 16px 20px;
-  margin-bottom: 14px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-top: 2px solid var(--accent);
-  box-shadow: var(--card-shadow);
+/* --- Chat Messages & Avatars (Refined Prompt & Response Bubbles) --- */
+.stApp [data-testid="stLayoutWrapper"]:has(> [data-testid="stChatMessage"]),
+.stApp [data-testid="stElementContainer"]:has(> [data-testid="stChatMessage"]) {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  position: relative;
+  z-index: 1;
+}
+
+.stApp [data-testid="stChatMessage"] {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 18px 22px !important;
+  gap: 14px !important;
+  align-items: flex-start !important;
+  border-radius: 6px 16px 16px 16px !important;
+  background: var(--panel) !important;
+  border: 1px solid var(--line) !important;
+  border-left: 3.5px solid var(--accent) !important;
+  box-shadow: var(--card-shadow) !important;
   line-height: 1.62;
+  overflow-wrap: anywhere;
 }
 
-[data-testid="stChatMessageContent"] > [data-testid="stVerticalBlock"] {
-  gap: 0.55rem !important;
+.stApp [data-testid="stChatMessageContent"] {
+  margin: 0 !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
 }
 
-[data-testid="stChatMessageAvatarAssistant"] {
-  background: var(--accent);
-  border-radius: 5px;
-  box-shadow: none;
+.stApp [data-testid="stChatMessageContent"] > [data-testid="stVerticalBlock"] {
+  gap: 0.5rem !important;
 }
 
-[data-testid="stChatMessageAvatarAssistant"] * {
-  color: #FFFFFF;
+.stApp [data-testid="stChatMessageContent"] p:last-child {
+  margin-bottom: 0;
 }
 
-[data-testid="stChatMessageAvatarUser"] {
-  display: none;
+.stApp [data-testid="stChatMessageAvatarAssistant"],
+.stApp [data-testid="stChatMessageAvatarCustom"] {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  background: var(--accent) !important;
+  border: none !important;
+  border-radius: 9px !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14) !important;
+  color: #FFFFFF !important;
 }
 
-[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]),
-[data-testid="stChatMessage"]:has(.cs-user-actions) {
-  flex-direction: row-reverse;
-  margin-left: auto;
-  width: fit-content;
-  max-width: 84%;
-  background: var(--bubble-user);
-  border: 1px solid var(--accent-edge);
-  border-top: 1px solid var(--accent-edge);
-  border-radius: 6px 6px 2px 6px;
-  box-shadow: 2px 2px 0 var(--accent-edge);
+.stApp [data-testid="stChatMessageAvatarAssistant"] *,
+.stApp [data-testid="stChatMessageAvatarCustom"] * {
+  color: #FFFFFF !important;
 }
 
-[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) p,
-[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) li,
-[data-testid="stChatMessage"]:has(.cs-user-actions) p,
-[data-testid="stChatMessage"]:has(.cs-user-actions) li {
-  color: #FFFFFF;
+.stApp [data-testid="stChatMessageAvatarUser"] {
+  display: none !important;
+}
+
+.stApp [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]),
+.stApp [data-testid="stChatMessage"]:has(.cs-user-actions) {
+  display: flex !important;
+  flex-direction: row !important;
+  margin: 8px 0 2px auto !important;
+  width: fit-content !important;
+  min-width: min(140px, 100%);
+  max-width: 80% !important;
+  padding: 13px 18px 11px !important;
+  gap: 0 !important;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--hero) 100%) !important;
+  border: 1px solid var(--accent-edge) !important;
+  border-left: 1px solid var(--accent-edge) !important;
+  border-radius: 16px 16px 4px 16px !important;
+  box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.24) !important;
+}
+
+.stApp [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) [data-testid="stChatMessageContent"],
+.stApp [data-testid="stChatMessage"]:has(.cs-user-actions) [data-testid="stChatMessageContent"] {
+  flex: 0 1 auto !important;
+  max-width: 100%;
+}
+
+.stApp [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) p,
+.stApp [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) li,
+.stApp [data-testid="stChatMessage"]:has(.cs-user-actions) p,
+.stApp [data-testid="stChatMessage"]:has(.cs-user-actions) li {
+  color: #FFFFFF !important;
   font-weight: 500;
+  line-height: 1.5;
 }
 
-[data-testid="stChatMessage"] strong {
+.stApp [data-testid="stChatMessage"] strong {
   color: var(--accent-text);
   font-weight: 700;
 }
 
-[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) strong,
-[data-testid="stChatMessage"]:has(.cs-user-actions) strong {
-  color: #FFFFFF;
+.stApp [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) strong,
+.stApp [data-testid="stChatMessage"]:has(.cs-user-actions) strong {
+  color: #FFFFFF !important;
 }
 
 .attach {
@@ -677,7 +948,7 @@ hr {
   font-size: 0.8rem;
   line-height: 1.4;
   color: rgba(255, 255, 255, 0.92);
-  background: rgba(0, 0, 0, 0.16);
+  background: rgba(0, 0, 0, 0.18);
   border-left: 2.5px solid rgba(255, 255, 255, 0.78);
   border-radius: 6px;
   padding: 5px 10px;
@@ -686,27 +957,33 @@ hr {
 }
 
 /* User bubble inline Copy button */
+.stApp [data-testid="stElementContainer"]:has(.cs-user-actions) {
+  width: 100% !important;
+  min-width: 0;
+  margin: 0 !important;
+}
+
 .cs-user-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .cs-user-copy {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: rgba(0, 0, 0, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.32);
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  border-radius: 999px;
   color: #FFFFFF;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  padding: 3px 9px;
-  min-height: 25px;
+  padding: 2px 10px;
+  min-height: 24px;
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
@@ -836,11 +1113,17 @@ hr {
   overflow: visible !important;
 }
 
-/* Toolbar row beneath each assistant card */
+/* Toolbar row beneath each assistant card (strictly positive margins so bubbles never collide) */
 [class*="st-key-tools_"] {
-  margin: -8px 0 10px 6px;
+  position: relative;
+  z-index: 2;
+  margin: 0 0 10px 4px !important;
   gap: 4px !important;
   align-items: center;
+}
+
+[class*="st-key-tools_"]:has(.cs-share-menu.is-open) {
+  z-index: 80 !important;
 }
 
 [class*="st-key-reply_btn_"] button {
@@ -942,7 +1225,7 @@ hr {
 
 .stMarkdown th {
   background: var(--hero);
-  color: #F4F1EA;
+  color: #FFFFFF;
   text-align: left;
   padding: 9px 14px;
   font-family: var(--font-mono);
@@ -950,7 +1233,7 @@ hr {
   font-size: 0.74rem;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  border-bottom: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent-edge);
 }
 
 .stMarkdown td {
@@ -1956,7 +2239,7 @@ div[role="dialog"] button[aria-label="Close"] svg {
 @media (max-width: 640px) {
   .block-container {
     padding-top: 0.75rem;
-    padding-bottom: 6.5rem;
+    padding-bottom: 7.5rem;
     padding-left: 0.85rem;
     padding-right: 0.85rem;
   }
@@ -1992,13 +2275,16 @@ div[role="dialog"] button[aria-label="Close"] svg {
   .empty-title {
     font-size: 1.5rem;
   }
-  [data-testid="stChatMessage"] {
-    padding: 14px 14px;
-    border-radius: 14px;
+  .stApp [data-testid="stChatMessage"] {
+    padding: 14px 16px !important;
+    gap: 10px !important;
+    border-radius: 6px 14px 14px 14px !important;
   }
-  [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
-    max-width: 90%;
-    padding: 12px 14px;
+  .stApp [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]),
+  .stApp [data-testid="stChatMessage"]:has(.cs-user-actions) {
+    max-width: 88% !important;
+    padding: 12px 15px 10px !important;
+    border-radius: 14px 14px 4px 14px !important;
   }
   .stMarkdown table {
     display: block;
@@ -2054,15 +2340,16 @@ div[role="dialog"] button[aria-label="Close"] svg {
   .st-key-sports_row button span[data-testid="stIconMaterial"] {
     display: none;
   }
+  .brand-logo {
+    width: 34px;
+    height: 34px;
+  }
   .wordmark {
-    font-size: 1.25rem;
+    font-size: 1.18rem;
   }
 }
 
 @media (max-width: 390px) {
-  .wordmark-badge {
-    display: none;
-  }
   .stApp .st-key-dark label p {
     font-size: 0.82rem;
   }
@@ -2100,21 +2387,100 @@ def _svg_bg(name, stroke, width=2.2):
     return f'url("data:image/svg+xml;base64,{b64}")'
 
 
+def brand_logo_svg(sport="Basketball", dark=False):
+    """Build the CourtSense geometric sports-crest vector logo (pure vector paths, no text)."""
+    mode = "dark" if dark else "light"
+    accent_hex = THEMES.get(sport, THEMES["Basketball"])[mode]["accent"]
+    return (
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60' fill='none'>"
+        "<defs>"
+        "<linearGradient id='cs-bg' x1='0' y1='0' x2='1' y2='1'>"
+        "<stop offset='0%' stop-color='#1B2230' stop-opacity='0.88'/>"
+        "<stop offset='100%' stop-color='#090C12' stop-opacity='0.96'/>"
+        "</linearGradient>"
+        "<linearGradient id='cs-rim' x1='0' y1='0' x2='0' y2='1'>"
+        "<stop offset='0%' stop-color='#FFFFFF' stop-opacity='0.98'/>"
+        "<stop offset='100%' stop-color='#FFFFFF' stop-opacity='0.65'/>"
+        "</linearGradient>"
+        "<clipPath id='cs-clip'>"
+        "<path d='M12 6 H48 L54 12 V28.5 C54 40.5 43.8 49 30 54.6 C16.2 49 6 40.5 6 28.5 V12 Z'/>"
+        "</clipPath>"
+        "</defs>"
+        # Outer sculpted athletic shield
+        "<path d='M11 4 H49 L56 11 V29 C56 42 45 51 30 57 C15 51 4 42 4 29 V11 Z' "
+        "fill='url(#cs-bg)' stroke='url(#cs-rim)' stroke-width='2.4' stroke-linejoin='round'/>"
+        # Clipped interior: broadcast specular sheen + court center-circle blueprint
+        "<g clip-path='url(#cs-clip)'>"
+        "<path d='M4 4 H56 V19 L4 34 Z' fill='#FFFFFF' fill-opacity='0.09'/>"
+        "<path d='M6 29 H54' stroke='#FFFFFF' stroke-opacity='0.18' stroke-width='1.1'/>"
+        "<circle cx='30' cy='29' r='13.5' stroke='#FFFFFF' stroke-opacity='0.22' stroke-width='1.1'/>"
+        "<path d='M14 50 H46' stroke='#FFFFFF' stroke-opacity='0.16' stroke-width='1.1'/>"
+        "</g>"
+        # Inner hairline shield bevel
+        "<path d='M13 8.2 H47 L51.8 13 V28.2 C51.8 38.6 42.6 46.2 30 51.3 "
+        "C17.4 46.2 8.2 38.6 8.2 28.2 V13 Z' "
+        "stroke='#FFFFFF' stroke-opacity='0.22' stroke-width='1'/>"
+        # Top crest intelligence diamond & tactical wings
+        "<path d='M20 12.2 H25.2 M34.8 12.2 H40' stroke='#FFFFFF' stroke-opacity='0.55' "
+        "stroke-width='1.4' stroke-linecap='round'/>"
+        f"<polygon points='30,9.2 33,12.2 30,15.2 27,12.2' fill='{accent_hex}' "
+        "stroke='#FFFFFF' stroke-width='1'/>"
+        # Bespoke geometric athletic 'C' & 'S' vector monogram (pure paths, zero <text>)
+        "<path d='M26.5 19.5 H19 L15 23.5 V34.5 L19 38.5 H26.5' "
+        "stroke='#FFFFFF' stroke-width='3.4' stroke-linecap='square' stroke-linejoin='miter'/>"
+        "<path d='M44.5 19.5 H36.5 L33 23 V26 L36.5 29 H41.5 L45 32 V35 L41.5 38.5 H33' "
+        "stroke='#FFFFFF' stroke-width='3.4' stroke-linecap='square' stroke-linejoin='miter'/>"
+        # Lower court-tip chevron accent
+        f"<path d='M25.5 44.5 L30 47.6 L34.5 44.5' stroke='{accent_hex}' "
+        "stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/>"
+        "</svg>"
+    )
+
+
+def _brand_logo_bg(sport="Basketball", dark=False):
+    b64 = base64.b64encode(brand_logo_svg(sport, dark).encode("utf-8")).decode("ascii")
+    return f'url("data:image/svg+xml;base64,{b64}")'
+
+
 def get_css(sport="Basketball", topic="Rules", dark=False):
     mode = "dark" if dark else "light"
     theme = {**BASE[mode], **THEMES.get(sport, THEMES["Basketball"])[mode]}
     root = ":root{" + "".join(f"--{k}:{v};" for k, v in theme.items()) + "}"
     art = ART.get(sport, ART["Basketball"])
+    page_tile = _page_bg_tile(sport, theme["accent"], 0.115 if dark else 0.105)
+    page_bg = (
+        ".stApp{"
+        "background-image:"
+        "radial-gradient(ellipse 960px 440px at 50% -40px,var(--bg-glow) 0%,transparent 72%),"
+        "radial-gradient(ellipse 560px 440px at 0% 100%,var(--bg-glow-soft) 0%,transparent 70%),"
+        "radial-gradient(ellipse 560px 440px at 100% 95%,var(--bg-glow-soft) 0%,transparent 70%),"
+        f"{page_tile};"
+        "background-size:100% 100%,100% 100%,100% 100%,360px 360px;"
+        "background-position:center top,left bottom,right bottom,center top;"
+        "background-repeat:no-repeat,no-repeat,no-repeat,repeat;"
+        "background-attachment:fixed,fixed,fixed,fixed;}"
+    )
     hero_bg = (
         ".st-key-hero{"
-        "background-image:linear-gradient(105deg,var(--hero-start) 48%,var(--hero-end) 100%),"
-        "url(\"data:image/svg+xml," + quote(art) + "\");"
-        "background-size:100% 100%,auto 130%;"
-        "background-position:0 0,right -28px center;"
+        "background-image:"
+        "linear-gradient(95deg,var(--hero-scrim) 0%,var(--hero-scrim-mid) 38%,rgba(0,0,0,0) 72%),"
+        "url(\"data:image/svg+xml," + quote(art) + "\"),"
+        "linear-gradient(125deg,var(--hero-start) 0%,var(--hero-end) 100%);"
+        "background-size:100% 100%,auto 106%,100% 100%;"
+        "background-position:0 0,right 6px center,0 0;"
         "background-repeat:no-repeat;}"
+        "@media (max-width:640px){.st-key-hero{"
+        "background-size:100% 100%,auto 100%,100% 100%;"
+        "background-position:0 0,right -28px center,0 0;}}"
     )
+    sport_btns_css = "".join(
+        f".stApp .st-key-sp_{name} button{{background-image:{_sport_btn_bg(name, '#FFFFFF', 0.22)};}}"
+        for name in _BTN_ART_SHAPES
+    )
+    active_btn_art = _sport_btn_bg(sport if sport in _BTN_ART_SHAPES else "Basketball", theme["hero"], 0.16)
     m, acc = theme["muted"], theme["accent-text"]
     icons_css = (
+        f".brand-logo{{background-image:{_brand_logo_bg(sport, dark)};}}"
         f".cs-ic-copy{{background-image:{_svg_bg('copy', m)};}}"
         f".cs-ic-paste{{background-image:{_svg_bg('paste', m)};}}"
         f".cs-ic-share{{background-image:{_svg_bg('share', m)};}}"
@@ -2131,14 +2497,15 @@ def get_css(sport="Basketball", topic="Rules", dark=False):
     tp = f".stApp .st-key-tp_{topic}"
     active = (
         f"{sp} button,{sp} button:hover{{"
-        f"background:var(--accent) !important;border-color:var(--accent) !important;color:#FFFFFF !important;"
-        f"box-shadow:0 2px 0 var(--accent-edge) !important;}}"
-        f"{sp} button p,{sp} button:hover p{{color:#FFFFFF !important;font-weight:700 !important;}}"
-        f"{sp} button span[data-testid='stIconMaterial']{{color:#FFFFFF !important;}}"
+        f"background-color:#FFFFFF !important;background-image:{active_btn_art} !important;"
+        f"border-color:#FFFFFF !important;color:var(--hero) !important;"
+        f"transform:translateY(-1px);box-shadow:0 5px 16px rgba(0,0,0,0.24) !important;}}"
+        f"{sp} button p,{sp} button:hover p{{color:var(--hero) !important;font-weight:700 !important;}}"
+        f"{sp} button span[data-testid='stIconMaterial']{{color:var(--hero) !important;}}"
         f"{tp} button{{"
-        f"border-bottom-color:var(--accent) !important;background:rgba(255,255,255,0.06) !important;}}"
+        f"border-bottom-color:#FFFFFF !important;background:rgba(255,255,255,0.16) !important;}}"
         f"{tp} button p{{color:#FFFFFF !important;font-weight:700 !important;}}"
-        f"{tp} button span[data-testid='stIconMaterial']{{color:var(--accent) !important;}}"
+        f"{tp} button span[data-testid='stIconMaterial']{{color:#FFFFFF !important;}}"
     )
     font_links = (
         '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
@@ -2148,4 +2515,4 @@ def get_css(sport="Basketball", topic="Rules", dark=False):
     font_import = f"@import url('{FONT_URL}');"
     # Keep <style> at column 0 of its own Markdown block (CommonMark Type 1 HTML block)
     # so blank lines inside CSS are never parsed as Markdown paragraphs.
-    return "<style>" + font_import + root + CSS + hero_bg + icons_css + active + "</style>\n\n" + font_links
+    return "<style>" + font_import + root + CSS + page_bg + hero_bg + sport_btns_css + icons_css + active + "</style>\n\n" + font_links
