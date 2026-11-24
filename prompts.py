@@ -9,22 +9,32 @@ Techniques used (for the presentation):
 """
 
 SPORT_NOTES = {
+    "Basketball": (
+        "ESPN digital box-score archives for NBA season splits begin in the "
+        "1984-85 season. For pre-1984 NBA seasons (e.g. Wilt Chamberlain, Bill Russell, "
+        "classic eras), when per-game splits are unavailable in the feed, you may cite "
+        "well-established historical NBA records (such as Wilt's 50.4 PPG in 1961-62, MVPs, "
+        "championships, and iconic milestones) from your basketball knowledge, in addition to "
+        "any career totals provided."
+    ),
     "Football": (
         "Football means association football (soccer) unless the user says "
         "American football."
     ),
     "Volleyball": (
-        "Live volleyball league standings and results may be provided by the "
-        "app, but there is no free live per-player stats feed. For player "
-        "stats, explain the stat and invite the user to attach a box score "
-        "with the + button."
+        "Live volleyball league standings and results are provided by the "
+        "app. When asked about volleyball player stats or performance (current or "
+        "past seasons), share their player profile, position, club and national team "
+        "accomplishments, and season metrics (kills per set, hitting %, aces, blocks) "
+        "based on verified sports records as guided by the Live data section, and "
+        "invite the user to attach a box score with the + button for match-specific box sheets."
     ),
 }
 
 MODE_NOTES = {
     "Rules": "Answer in terms of rules, fouls, penalties and referee calls. Mention league differences (e.g. FIBA vs NBA).",
     "Strategy": "Answer in terms of positions, formations and tactics, and why teams use them.",
-    "Stats": "Answer in terms of what a stat means and why people care about it. When the app provides a Live data section, use those numbers for player and league answers and cite the season and source shown. Compare players only with data the user gives you or the app provides.",
+    "Stats": "Answer in terms of what a stat means and why people care about it. When the app provides a Live data section, use those numbers for player and league answers and cite the season and source shown. The user may ask about past seasons (e.g. 'Curry stats 2023 season', 'standings last season'); the app will fetch the correct season's data when available. Compare players only with data the user gives you or the app provides.",
     "Quiz": (
         "Run a short trivia quiz of 5 questions. Ask ONE question at a time as "
         "multiple choice (A to D), wait for the answer, say whether it was right "
@@ -56,9 +66,12 @@ briefly and mention they can switch topic tabs.
 3. Explain jargon the first time it appears.
 4. For stats, say what the number means and why people care about it.
 5. Only use scores, standings and player stats that the user gives you or the
-   app provides in the Live data section. If you do not have current data, say
-   so and point the user to an official source. Never make up numbers, quotes
-   or dates.
+   app provides in the Live data section. For basketball pre-1984 seasons or
+   volleyball player metrics where the Live data section provides knowledge guidance,
+   share the verified records, player profiles, season metrics and career achievements
+   described in that guidance. If you do not have current data and no guidance
+   applies, say so and point the user to an official source. Never make up numbers,
+   quotes or dates.
 6. Mention it when rules differ between leagues.
 7. Keep facts and opinions separate. A prediction is an opinion; stay neutral
    between teams and players.
