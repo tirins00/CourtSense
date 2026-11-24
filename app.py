@@ -20,6 +20,7 @@ import streamlit as st
 from groq import Groq
 
 import defenses
+import stats
 from prompts import build_quiz_prompt, build_system_prompt
 from styles import get_css
 
@@ -51,24 +52,24 @@ TAGLINES = {
 PLACEHOLDERS = {
     "Rules": "Ask about a rule, foul, or penalty",
     "Strategy": "Ask about a play or formation",
-    "Stats": "Ask about a stat, or press + to attach a box score",
+    "Stats": "Ask about a stat, a player or a league table, or press + to attach a box score",
     "Quiz": "Type your answer, or ask for a new question",
 }
 STARTERS = {
     "Basketball": {
         "Rules": ["What is a travelling violation?", "How does the 3-second rule work?"],
         "Strategy": ["Explain the pick and roll", "What is a zone defense?"],
-        "Stats": ["What does assist-to-turnover ratio tell me?", "What is true shooting percentage?"],
+        "Stats": ["How many points is LeBron James averaging?", "Show the NBA standings"],
     },
     "Volleyball": {
         "Rules": ["How does rotation work?", "What is a double contact?"],
         "Strategy": ["What does a libero do?", "Explain the 5-1 system"],
-        "Stats": ["What is hitting percentage?", "What counts as a dig?"],
+        "Stats": ["What is hitting percentage?", "Show the SuperLega standings"],
     },
     "Football": {
         "Rules": ["How does the offside rule work?", "When is a handball a foul?"],
         "Strategy": ["Explain the 4-3-3 formation", "What is a high press?"],
-        "Stats": ["What is xG (expected goals)?", "What counts as an assist?"],
+        "Stats": ["How many goals has Haaland scored this season?", "Show the Premier League table"],
     },
 }
 QUIZ_LEN = 5
@@ -600,6 +601,14 @@ def get_client():
     return Groq(api_key=key)
 
 
+def get_vb_key():
+    """Optional free API-Sports key for volleyball league data. None is fine."""
+    try:
+        return st.secrets["API_SPORTS_KEY"]
+    except Exception:
+        return os.environ.get("API_SPORTS_KEY")
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def list_chat_models(_client):
     """Ask Groq which chat models this key can use right now."""
@@ -651,9 +660,9 @@ def read_upload(f):
     return text[: defenses.MAX_FILE_CHARS]
 
 
-def build_messages(topic_now, level, token):
+def build_messages(topic_now, level, token, live_data=None):
     msgs = [{"role": "system",
-             "content": build_system_prompt(sport, topic_now, level, token, defenses.CANARY)}]
+             "content": build_system_prompt(sport, topic_now, level, token, defenses.CANARY, live_data)}]
     hist = ss.messages
     last_att = max((i for i, m in enumerate(hist) if m.get("attachment")), default=-1)
     live = [(i, m) for i, m in enumerate(hist) if not m.get("blocked")][-12:]
@@ -820,7 +829,8 @@ with st.sidebar:
         st.rerun()
     st.divider()
     st.caption("Each sport and topic keeps its own chat. CourtSense explains rules, plays and "
-               "stats. It does not give betting tips, and it only uses numbers you provide.")
+               "stats, with live player and league numbers from ESPN (basketball, football) and "
+               "API-Sports (volleyball) when available. It does not give betting tips.")
 
 # ---------- input (hidden in Quiz mode: the quiz is button-based) ----------
 value = None
@@ -969,9 +979,17 @@ if ss.generate and topic != "Quiz":
     with st.chat_message("assistant", avatar=icon):
         box, reply = st.empty(), ""
         try:
+            last_user = ss.messages[-1]["content"].lower()
+            topic_now = "Quiz" if "quiz" in last_user else topic
+            live_data = None
+            if topic_now == "Stats" or (topic_now != "Quiz" and stats.HINT.search(last_user)):
+                with st.spinner("Fetching live stats…"):
+                    route = stats.route_question(client, sport, ss.messages[-1]["content"], model)
+                    live_data = stats.fetch_live_data(sport, route, get_vb_key())
             stream = client.chat.completions.create(
-                model=model, temperature=temperature, max_tokens=500, stream=True,
-                messages=build_messages(topic, level, token),
+                model=model, temperature=temperature,
+                max_tokens=900 if live_data else 500, stream=True,
+                messages=build_messages(topic_now, level, token, live_data),
             )
             for chunk in stream:
                 reply += chunk.choices[0].delta.content or ""
