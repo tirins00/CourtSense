@@ -1,4 +1,4 @@
-"""CourtSense: a sports rules and stats helper (Streamlit + Groq)."""
+"""CourtSense: a sports rules and stats helper (Streamlit + OpenAI / Groq)."""
 import base64
 import html
 import inspect
@@ -17,12 +17,21 @@ if str(_app_dir) not in sys.path:
     sys.path.insert(0, str(_app_dir))
 
 import streamlit as st
-from groq import Groq
+
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
+
+try:
+    from groq import Groq
+except ImportError:
+    Groq = None
 
 import defenses
 import stats
 from prompts import build_quiz_prompt, build_system_prompt
-from styles import brand_logo_svg, get_css
+from styles import brand_logo_svg, get_css, loading_ball_html
 
 _SUPPORTS_INLINE_JS = "unsafe_allow_javascript" in inspect.signature(st.html).parameters
 
@@ -35,12 +44,22 @@ st.set_page_config(
 SPORTS = ["Basketball", "Volleyball", "Football"]
 TOPICS = ["Rules", "Strategy", "Stats", "Quiz"]
 LEVELS = ["Beginner", "Intermediate", "Advanced"]
-MODELS = [
+OPENAI_BASE_URL = "https://aiki-labs.up.railway.app/api/v1"
+OPENAI_MAX_COMPLETION_TOKENS = 800
+OPENAI_MODELS = [
+    "gpt-6-luna",
+]
+GROQ_MODELS = [
     "llama-3.3-70b-versatile",
     "openai/gpt-oss-20b",
     "openai/gpt-oss-120b",
     "qwen/qwen3-32b",
 ]
+MODELS = OPENAI_MODELS
+PROVIDER_LABELS = {
+    "openai": "OpenAI (Aiki Labs)",
+    "groq": "Groq (Fallback)",
+}
 TOPIC_ICONS = {
     "Rules": ":material/gavel:",
     "Strategy": ":material/schema:",
@@ -560,78 +579,103 @@ def generate_quiz(n=QUIZ_LEN):
     themes = random.sample(QUIZ_THEMES[sport], k=min(n, len(QUIZ_THEMES[sport])))
     seen = ss.quiz_seen.setdefault(sport, [])
     prompt = build_quiz_prompt(sport, level, themes, seen[-25:], random.randint(10000, 99999))
-    client = get_client()
+    quiz_messages = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": f"Write {n} new {sport} quiz questions as JSON."},
+    ]
     resp = None
     last_err = None
-    for cand_model in _candidate_models(model, model_options):
-        kwargs = dict(
-            model=cand_model,
-            temperature=max(0.9, temperature),
-            max_tokens=2000,
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": f"Write {n} new {sport} quiz questions as JSON."},
-            ],
-        )
+    for cand_provider, cand_client, cand_model in _provider_attempts(provider, model, model_options):
+        max_out = OPENAI_MAX_COMPLETION_TOKENS if cand_provider == "openai" else 2000
         try:
-            try:
-                resp = client.chat.completions.create(response_format={"type": "json_object"}, **kwargs)
-            except Exception as e:
-                if _is_model_not_found(e):
-                    raise
-                resp = client.chat.completions.create(**kwargs)  # model without JSON mode
+            resp = _create_completion(
+                cand_client,
+                cand_provider,
+                cand_model,
+                quiz_messages,
+                temperature=max(0.9, temperature),
+                max_out=max_out,
+                response_format={"type": "json_object"},
+            )
             break
         except Exception as e:
             if _is_model_not_found(e):
-                ss.unavailable_models.add(cand_model)
-                last_err = e
-                continue
-            raise
+                ss.unavailable_models.add(f"{cand_provider}:{cand_model}")
+            last_err = e
+            continue
     if resp is None:
-        raise last_err or RuntimeError("No accessible Groq chat model found for this API key.")
+        raise last_err or RuntimeError("No accessible chat model found for the configured API key(s).")
     questions = parse_quiz(resp.choices[0].message.content, n)
     seen.extend(q["question"] for q in questions)
     del seen[:-60]
     return questions
 
 
-def get_client():
-    key = None
+def _get_secret(name):
+    """Look up a secret from st.secrets, environment variables, or local secrets.toml."""
     try:
-        key = st.secrets["GROQ_API_KEY"]
+        val = st.secrets[name]
+        if val:
+            return str(val).strip()
     except Exception:
         pass
-    if not key:
-        key = os.environ.get("GROQ_API_KEY")
-    if not key:
-        # Fallback: check .streamlit/secrets.toml next to app.py or in parents
-        import tomllib
-        for cand in [
-            _app_dir / ".streamlit" / "secrets.toml",
-            _app_dir.parent / ".streamlit" / "secrets.toml",
-            _app_dir.parent.parent / ".streamlit" / "secrets.toml",
-        ]:
-            if cand.exists():
-                try:
-                    with open(cand, "rb") as f:
-                        key = tomllib.load(f).get("GROQ_API_KEY")
-                        if key:
-                            break
-                except Exception:
-                    pass
-    if not key:
-        st.error("No API key found. Add GROQ_API_KEY to .streamlit/secrets.toml "
-                 "(local) or to your app's Secrets (Streamlit Community Cloud).")
-        st.stop()
-    return Groq(api_key=key)
+    val = os.environ.get(name)
+    if val:
+        return val.strip()
+    import tomllib
+    for cand in [
+        _app_dir / ".streamlit" / "secrets.toml",
+        _app_dir.parent / ".streamlit" / "secrets.toml",
+        _app_dir.parent.parent / ".streamlit" / "secrets.toml",
+    ]:
+        if cand.exists():
+            try:
+                with open(cand, "rb") as f:
+                    found = tomllib.load(f).get(name)
+                    if found:
+                        return str(found).strip()
+            except Exception:
+                pass
+    return None
+
+
+def _openai_key():
+    return _get_secret("OPENAI_API_KEY") or _get_secret("AIKI_API_KEY")
+
+
+def _openai_base_url():
+    return _get_secret("OPENAI_BASE_URL") or _get_secret("AIKI_BASE_URL") or OPENAI_BASE_URL
+
+
+def _groq_key():
+    return _get_secret("GROQ_API_KEY")
+
+
+def available_providers():
+    """Return configured LLM providers in priority order (OpenAI primary, Groq fallback)."""
+    out = []
+    if OpenAI is not None and _openai_key():
+        out.append("openai")
+    if Groq is not None and _groq_key():
+        out.append("groq")
+    return out
+
+
+def get_client(selected_provider=None):
+    providers = available_providers()
+    target = selected_provider if selected_provider in providers else (providers[0] if providers else None)
+    if target == "openai":
+        return OpenAI(api_key=_openai_key(), base_url=_openai_base_url())
+    if target == "groq":
+        return Groq(api_key=_groq_key())
+    st.error("No API key found. Add OPENAI_API_KEY (or optional fallback GROQ_API_KEY) to "
+             ".streamlit/secrets.toml (local) or to your app's Secrets (Streamlit Community Cloud).")
+    st.stop()
 
 
 def get_vb_key():
     """Optional free API-Sports key for volleyball league data. None is fine."""
-    try:
-        return st.secrets["API_SPORTS_KEY"]
-    except Exception:
-        return os.environ.get("API_SPORTS_KEY")
+    return _get_secret("API_SPORTS_KEY")
 
 
 def _is_model_not_found(exc):
@@ -639,19 +683,24 @@ def _is_model_not_found(exc):
     return type(exc).__name__ == "NotFoundError" or "model_not_found" in msg or "does not exist" in msg
 
 
-def _candidate_models(selected, options):
+def _provider_models(selected_provider):
+    return OPENAI_MODELS if selected_provider == "openai" else GROQ_MODELS
+
+
+def _candidate_models(selected, options, selected_provider="openai"):
     seen, out = set(), []
-    for m in [selected, *options, *MODELS]:
-        if m and m not in seen and m not in ss.unavailable_models:
+    for m in [selected, *options, *_provider_models(selected_provider)]:
+        key = f"{selected_provider}:{m}"
+        if m and m not in seen and key not in ss.unavailable_models and m not in ss.unavailable_models:
             seen.add(m)
             out.append(m)
     return out
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def _list_chat_models_cached(_client):
-    """Ask Groq which active chat models this key can use right now."""
-    skip = ("whisper", "tts", "guard", "compound", "embed", "orpheus", "safeguard", "prompt-guard")
+def _list_chat_models_cached(_client, selected_provider):
+    """Ask the provider which active chat models this key can use right now."""
+    skip = ("whisper", "tts", "guard", "compound", "embed", "orpheus", "safeguard", "prompt-guard", "dall-e", "moderation")
     models = _client.models.list().data
     ids = []
     for m in models:
@@ -664,21 +713,88 @@ def _list_chat_models_cached(_client):
     return sorted(ids)
 
 
-def list_chat_models(client):
+def list_chat_models(client, selected_provider="openai"):
+    defaults = list(_provider_models(selected_provider))
     try:
-        ids = _list_chat_models_cached(client)
+        ids = _list_chat_models_cached(client, selected_provider)
     except Exception:
-        ids = list(MODELS)
-    usable = [i for i in ids if i not in ss.unavailable_models]
-    return usable or list(MODELS)
+        ids = list(defaults)
+    if selected_provider == "openai":
+        # Always include the configured default OpenAI model(s) (e.g. gpt-6-luna)
+        for m in reversed(defaults):
+            if m not in ids:
+                ids.insert(0, m)
+    usable = [
+        i for i in ids
+        if f"{selected_provider}:{i}" not in ss.unavailable_models and i not in ss.unavailable_models
+    ]
+    return usable or defaults
 
 
-def default_model_index(options):
-    for pref in ("llama-3.3-70b", "gpt-oss-120b", "gpt-oss-20b", "qwen", "llama-4", "llama", "70b", "120b", "20b"):
+def default_model_index(options, selected_provider="openai"):
+    prefs = (
+        ("gpt-6-luna", "gpt-6", "gpt-5", "gpt-4")
+        if selected_provider == "openai"
+        else ("llama-3.3-70b", "gpt-oss-120b", "gpt-oss-20b", "qwen", "llama-4", "llama", "70b", "120b", "20b")
+    )
+    for pref in prefs:
         for i, name in enumerate(options):
             if pref in name.lower():
                 return i
     return 0
+
+
+def _provider_attempts(primary_provider, primary_model, primary_options):
+    """Yield (provider, client, model) tuples: primary provider first, then optional Groq fallback."""
+    primary_client = get_client(primary_provider)
+    for m in _candidate_models(primary_model, primary_options, primary_provider):
+        yield primary_provider, primary_client, m
+    if primary_provider == "openai" and "groq" in available_providers():
+        groq_client = get_client("groq")
+        groq_options = list_chat_models(groq_client, "groq")
+        groq_default = groq_options[default_model_index(groq_options, "groq")]
+        for m in _candidate_models(groq_default, groq_options, "groq"):
+            yield "groq", groq_client, m
+
+
+def _create_completion(client, selected_provider, model_name, messages, temperature, max_out,
+                       stream=False, response_format=None):
+    """Call chat.completions.create with provider-appropriate token cap and safe parameter fallbacks."""
+    kwargs = {"model": model_name, "messages": messages, "temperature": temperature}
+    if stream:
+        kwargs["stream"] = True
+    if selected_provider == "openai":
+        kwargs["max_completion_tokens"] = min(max_out, OPENAI_MAX_COMPLETION_TOKENS)
+    else:
+        kwargs["max_tokens"] = max_out
+
+    def _invoke(extra=None):
+        call_kwargs = {**kwargs, **(extra or {})}
+        try:
+            return client.chat.completions.create(**call_kwargs)
+        except Exception as exc:
+            if "temperature" in str(exc).lower() and "temperature" in call_kwargs:
+                call_kwargs.pop("temperature", None)
+                return client.chat.completions.create(**call_kwargs)
+            raise
+
+    if response_format is not None:
+        try:
+            return _invoke({"response_format": response_format})
+        except Exception as exc:
+            if _is_model_not_found(exc):
+                raise
+            return _invoke()
+    return _invoke()
+
+
+def _fallback_router_target(primary_provider):
+    """Return a (client, model, provider) tuple for Groq fallback routing if available."""
+    if primary_provider == "openai" and "groq" in available_providers():
+        fb_client = get_client("groq")
+        fb_opts = list_chat_models(fb_client, "groq")
+        return (fb_client, fb_opts[default_model_index(fb_opts, "groq")], "groq")
+    return None
 
 
 def trim_runaway(text, max_words=400):
@@ -861,10 +977,25 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     level = st.radio("Detail level", LEVELS, key="level")
-    model_options = list_chat_models(get_client())
+    providers = available_providers()
+    if not providers:
+        get_client()  # displays configuration error and stops
+    if len(providers) > 1:
+        if ss.get("provider") not in providers:
+            ss.provider = providers[0]
+        provider = st.selectbox(
+            "Provider",
+            providers,
+            format_func=lambda p: PROVIDER_LABELS.get(p, p),
+            key="provider",
+            help="Primary is OpenAI (Aiki Labs). Groq is used automatically as a fallback if needed.",
+        )
+    else:
+        provider = providers[0]
+    model_options = list_chat_models(get_client(provider), provider)
     if ss.get("model") not in model_options:
         ss.pop("model", None)
-    model = st.selectbox("Model", model_options, index=default_model_index(model_options), key="model")
+    model = st.selectbox("Model", model_options, index=default_model_index(model_options, provider), key="model")
     temperature = st.slider("Temperature", 0.0, 1.0, 0.4, 0.1, key="temp",
                             help="Lower is more consistent. Higher is more varied.")
     st.divider()
@@ -962,14 +1093,20 @@ icon = AVATARS[sport]
 if topic == "Quiz":
     if ss.quiz_pending.get(sport):
         ss.quiz_pending[sport] = False
-        with st.spinner(f"Building a fresh {sport} quiz…"):
-            try:
-                ss.quizzes[sport] = {"questions": generate_quiz(), "idx": 0, "score": 0, "picks": []}
-                ss.quiz_error.pop(sport, None)
-            except Exception as e:
-                ss.quizzes.pop(sport, None)
-                detail = str(e)[:200] if isinstance(e, ValueError) else f"{type(e).__name__}"
-                ss.quiz_error[sport] = f"I couldn't build a quiz just now ({detail})."
+        quiz_loader = st.empty()
+        quiz_loader.markdown(
+            loading_ball_html(sport, f"Building a fresh {sport} quiz…", card=True),
+            unsafe_allow_html=True,
+        )
+        try:
+            ss.quizzes[sport] = {"questions": generate_quiz(), "idx": 0, "score": 0, "picks": []}
+            ss.quiz_error.pop(sport, None)
+        except Exception as e:
+            ss.quizzes.pop(sport, None)
+            detail = str(e)[:200] if isinstance(e, ValueError) else f"{type(e).__name__}"
+            ss.quiz_error[sport] = f"I couldn't build a quiz just now ({detail})."
+        finally:
+            quiz_loader.empty()
     render_quiz()
 
 # ---------- empty state ----------
@@ -1034,7 +1171,7 @@ for i, m in enumerate(ss.messages if topic != "Quiz" else []):
 # ---------- generate ----------
 if ss.generate and topic != "Quiz":
     ss.generate = False
-    client = get_client()
+    client = get_client(provider)
     token = defenses.new_token()
     with st.chat_message("assistant", avatar=icon):
         box, reply = st.empty(), ""
@@ -1043,44 +1180,70 @@ if ss.generate and topic != "Quiz":
             topic_now = "Quiz" if "quiz" in last_user else topic
             live_data = None
             active_model = model
+            box.markdown(loading_ball_html(sport, "Generating response…"), unsafe_allow_html=True)
             if topic_now == "Stats" or (topic_now != "Quiz" and stats.HINT.search(last_user)):
-                with st.spinner("Fetching live stats…"):
-                    context = "\n".join(f"{m['role'].capitalize()}: {m['content'][:250]}" for m in ss.messages[-4:-1])
-                    route = stats.route_question(client, sport, ss.messages[-1]["content"], active_model, context=context)
-                    live_data = stats.fetch_live_data(sport, route, get_vb_key())
-            msgs = build_messages(topic_now, level, token, live_data)
-            stream = None
-            last_err = None
-            for cand_model in _candidate_models(active_model, model_options):
-                try:
-                    stream = client.chat.completions.create(
-                        model=cand_model, temperature=temperature,
-                        max_tokens=900 if live_data else 500, stream=True,
-                        messages=msgs,
+                context = "\n".join(f"{m['role'].capitalize()}: {m['content'][:250]}" for m in ss.messages[-4:-1])
+                route = stats.route_question(
+                    client,
+                    sport,
+                    ss.messages[-1]["content"],
+                    active_model,
+                    context=context,
+                    provider=provider,
+                    fallback=_fallback_router_target(provider),
+                )
+                if route:
+                    vb_key = get_vb_key() if sport == "Volleyball" else None
+                    is_live_fetch = not (
+                        sport == "Volleyball" and (route["kind"] in ("player", "leaders") or not vb_key)
                     )
-                    active_model = cand_model
-                    break
+                    if is_live_fetch:
+                        box.markdown(loading_ball_html(sport, "Fetching live stats…"), unsafe_allow_html=True)
+                    live_data = stats.fetch_live_data(sport, route, vb_key)
+                    if is_live_fetch:
+                        box.markdown(loading_ball_html(sport, "Generating response…"), unsafe_allow_html=True)
+            msgs = build_messages(topic_now, level, token, live_data)
+            last_err = None
+            streamed = False
+            for cand_provider, cand_client, cand_model in _provider_attempts(provider, active_model, model_options):
+                max_out = (700 if live_data else 450) if cand_provider == "openai" else (900 if live_data else 500)
+                try:
+                    stream = _create_completion(
+                        cand_client,
+                        cand_provider,
+                        cand_model,
+                        msgs,
+                        temperature=temperature,
+                        max_out=max_out,
+                        stream=True,
+                    )
+                    reply = ""
+                    for chunk in stream:
+                        if not getattr(chunk, "choices", None):
+                            continue
+                        delta = chunk.choices[0].delta.content or ""
+                        if not delta:
+                            continue
+                        reply += delta
+                        reply, stop = trim_runaway(reply)
+                        box.markdown(reply + "▌")
+                        if stop:
+                            break
+                    if reply:
+                        streamed = True
+                        break
                 except Exception as e:
                     if _is_model_not_found(e):
-                        ss.unavailable_models.add(cand_model)
-                        last_err = e
-                        continue
-                    raise
-            if stream is None:
-                raise last_err or RuntimeError("No accessible Groq chat model found for this API key.")
-            for chunk in stream:
-                reply += chunk.choices[0].delta.content or ""
-                reply, stop = trim_runaway(reply)
-                box.markdown(reply + "▌")
-                if stop:
-                    break
+                        ss.unavailable_models.add(f"{cand_provider}:{cand_model}")
+                    last_err = e
+                    if reply:
+                        raise
+                    continue
+            if not streamed and not reply:
+                raise last_err or RuntimeError("No accessible chat model found for the configured API key(s).")
         except Exception as e:
             detail = str(e)
-            secret_values = [os.environ.get("GROQ_API_KEY")]
-            try:
-                secret_values.append(st.secrets["GROQ_API_KEY"])
-            except Exception:
-                pass
+            secret_values = [_openai_key(), _groq_key(), get_vb_key()]
             for secret in secret_values:
                 if secret:
                     detail = detail.replace(secret, "***")

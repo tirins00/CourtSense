@@ -33,7 +33,7 @@ HINT = re.compile(
     r"averag(e|es|ed|ing)|per game|per match|pg|"
     r"percentages?|pct|shooting|field goal|3-?points?|three-?points?|free throws?|"
     r"stats?|statistics|box score|numbers for|numbers|"
-    r"this season|current season|last season|career|"
+    r"this season|current season|last season|previous season|past season|career|all[- ]time|records?|"
     r"clean sheets?|cards?|aces?|kills?|digs?|"
     r"season|\d{4}(-\d{2,4})?)\b|%",
     re.I,
@@ -478,7 +478,7 @@ def _player_block(sport, path, label, player, season=None):
 
 @_cached(ttl=3600)
 def _standings_raw(path, year=None):
-    params = {"season": year} if year else None
+    params = {"season": year} if year is not None else None
     data = _get_json(f"https://site.api.espn.com/apis/v2/sports/{path}/standings", params=params)
     if data is None:
         raise _FetchError()
@@ -783,10 +783,6 @@ def _vb_block(route, key):
             target_season = s
             break
 
-    # Build the list of seasons to try.
-    # For a specific year or "last", try that first, then fall back to scanning
-    # the most recent seasons (needed when max_free is unknown or when the
-    # target season has no data).
     if target_season:
         fallback = [s for s in seasons[:6] if s != target_season]
         search_seasons = [target_season] + fallback
@@ -864,12 +860,19 @@ You extract live-stats queries for a sports app. The selected sport is {sport}.
 Reply with ONLY one JSON object, no prose:
 {{"kind": "player"|"standings"|"leaders"|"none", "names": [], "league": "", "stat": "", "team": "", "season": ""}}
 Rules:
-- "player": the user wants a specific player's numbers (current season, a past season like 2023 or last season, or career/all-time). names = list of full player names (up to 8 players; guess full names like "Curry" -> "Stephen Curry", or resolve pronouns like "he", "his", "him" from recent conversation context).
-- "standings": the user wants a league table / standings / who is first.
-- "leaders": the user wants the best players in a category (top scorers,
-  scoring leader, most assists). stat = the category in one or two words.
-- "none": concept questions (what does a stat mean), rules, strategy, quizzes,
-  small talk, or anything without a specific player or league.
+- "player": the user wants a specific player's numbers (current season, previous
+  season, or career/all-time). names = up to 3 full player names (guess the full
+  name, e.g. "LeBron" -> "LeBron James", or resolve pronouns like "he", "his",
+  "him" from recent conversation context).
+- "standings": the user wants a league table / standings / who is first
+  (current or previous season).
+- "leaders": the user wants the best players in a category for a single season
+  (current or previous season, e.g. top scorers, scoring leader, most assists).
+  stat = the category in one or two words. For all-time league leaders/records
+  with no specific player named, use "none".
+- "none": concept questions (what does a stat mean), all-time league records
+  without a named player, rules, strategy, quizzes, small talk, or anything
+  without a specific player or league season.
 - league: Basketball -> "NBA" or "WNBA" or "NCAA" if specified, else "NBA". Football -> one
   of: Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Champions League, MLS, Saudi Pro League;
   if a player is named but no league is stated, infer their club league
@@ -877,23 +880,44 @@ Rules:
   of: SuperLega, PlusLiga, CEV Champions League, Nations League; if none is
   named, use "".
 - team: only for standings, a team the user asks about (else "").
-- season: if the user asked about a specific season or past season, return the season year or label (e.g. "2023", "2024-25", "last", "last last", "2 seasons ago"), else "".
+- season: if the user asked about a specific season or past season, return the
+  season year or label (e.g. "2023", "2024-25", "last", "2 seasons ago"), else "".
 """
 
 
-def route_question(client, sport, text, model, context=""):
+def _call_router(client, model, provider, msgs):
+    token_kw = {"max_completion_tokens": 150} if provider == "openai" else {"max_tokens": 200}
+    try:
+        return client.chat.completions.create(
+            model=model, temperature=0, messages=msgs, **token_kw,
+        )
+    except Exception as exc:
+        if "temperature" in str(exc).lower():
+            return client.chat.completions.create(
+                model=model, messages=msgs, **token_kw,
+            )
+        raise
+
+
+def route_question(client, sport, text, model, context="", provider="openai", fallback=None):
     """Ask the chat model what live data (if any) the question needs.
 
     Uses the same model the user selected (guaranteed available), so this
-    never breaks when Groq retires a hardcoded model id.
+    never breaks when a provider retires a hardcoded model id. If the primary
+    API call fails and a fallback (client, model, provider) tuple is supplied,
+    retries once with the fallback.
     """
     try:
         ctx = f"Recent conversation context:\n{context}\n\n" if context.strip() else ""
-        resp = client.chat.completions.create(
-            model=model, temperature=0, max_tokens=1024,
-            messages=[{"role": "system", "content": ROUTER_SYSTEM.format(sport=sport, context_block=ctx)},
-                      {"role": "user", "content": text[:600]}],
-        )
+        msgs = [{"role": "system", "content": ROUTER_SYSTEM.format(sport=sport, context_block=ctx)},
+                {"role": "user", "content": text[:600]}]
+        try:
+            resp = _call_router(client, model, provider, msgs)
+        except Exception:
+            if not fallback:
+                raise
+            fb_client, fb_model, fb_provider = fallback
+            resp = _call_router(fb_client, fb_model, fb_provider, msgs)
         raw = resp.choices[0].message.content or ""
         m = re.search(r"\{.*\}", raw, re.S)
         if not m:
@@ -908,7 +932,7 @@ def route_question(client, sport, text, model, context=""):
                 "league": str(q.get("league") or "")[:40],
                 "stat": str(q.get("stat") or "")[:40],
                 "team": str(q.get("team") or "")[:40],
-                "season": str(q.get("season") or "")[:15]}
+                "season": str(q.get("season") or "").strip()[:15]}
     except Exception:
         return None
 
@@ -936,7 +960,7 @@ def fetch_live_data(sport, route, vb_key=None):
             return _clean(block) if block else None
         league = _resolve_league(sport, route.get("league"))
         kind = route["kind"]
-        season_req = route.get("season")
+        req_season = route.get("season")
         if kind == "player":
             all_leagues = list(dict.fromkeys(ESPN_LEAGUES[sport].values()))
             parts = []
@@ -968,7 +992,7 @@ def fetch_live_data(sport, route, vb_key=None):
 
                 block = None
                 for p, l in candidates:
-                    b = _player_block(sport, p, l, player, season=season_req)
+                    b = _player_block(sport, p, l, player, season=req_season)
                     if b and not b.startswith("No live"):
                         block = b
                         break
@@ -979,9 +1003,9 @@ def fetch_live_data(sport, route, vb_key=None):
                 return None
             path, label = ESPN_LEAGUES[sport][league]
             if kind == "standings":
-                block = _standings_block(sport, path, label, route.get("team"), season=season_req)
+                block = _standings_block(sport, path, label, route.get("team"), season=req_season)
             else:
-                block = _leaders_block(sport, path, label, route.get("stat"), season=season_req)
+                block = _leaders_block(sport, path, label, route.get("stat"), season=req_season)
         return _clean(block) if block else None
     except Exception:
         return None

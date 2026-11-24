@@ -21,8 +21,9 @@ pip install -r requirements.txt
 cp .streamlit/secrets.toml.example .streamlit/secrets.toml   # then add your key
 streamlit run app.py
 ```
-Get a free API key at https://console.groq.com. The key lives only in
-`.streamlit/secrets.toml` (git-ignored) or an environment variable named `GROQ_API_KEY`.
+Add your API key to `.streamlit/secrets.toml` (git-ignored) or environment variables:
+- Primary (OpenAI-compatible Aiki Labs endpoint): `OPENAI_API_KEY` (and optional `OPENAI_BASE_URL`, defaults to `https://aiki-labs.up.railway.app/api/v1`, model `gpt-6-luna`, `max_completion_tokens <= 800`).
+- Optional fallback (Groq, free key at https://console.groq.com): `GROQ_API_KEY`. Used automatically if `OPENAI_API_KEY` is not set or if the primary endpoint fails.
 
 ## Live stats (`stats.py`)
 In the Stats topic (and on stats questions in other topics), a small router
@@ -46,8 +47,8 @@ to the main model as a trusted, app-provided block in the system prompt.
 ## Deploy (Streamlit Community Cloud)
 1. Push this folder to a public GitHub repo (the key is not in it).
 2. Create a new app at share.streamlit.io pointing to `app.py`.
-3. In Advanced settings, Secrets, paste: `GROQ_API_KEY = "your key"`
-   (and optionally `API_SPORTS_KEY = "your key"` for volleyball league data).
+3. In Advanced settings, Secrets, paste: `OPENAI_API_KEY = "your key"`
+   (plus optional `GROQ_API_KEY = "your key"` for fallback and `API_SPORTS_KEY = "your key"` for volleyball league data).
 
 ## Prompt engineering (`prompts.py`)
 Role prompting, explicit numbered instructions, a few-shot example,

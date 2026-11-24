@@ -9,6 +9,7 @@ Light and dark modes share an ultra-refined design system driven by CSS variable
   - Accessible micro-interactions, responsive touch targets, and reduced-motion support
 """
 import base64
+import html
 from urllib.parse import quote
 
 THEMES = {
@@ -894,7 +895,7 @@ hr {
   width: fit-content !important;
   min-width: min(140px, 100%);
   max-width: 80% !important;
-  padding: 13px 18px 11px !important;
+  padding: 14px 18px 12px !important;
   gap: 0 !important;
   background: linear-gradient(135deg, var(--accent) 0%, var(--hero) 100%) !important;
   border: 1px solid var(--accent-edge) !important;
@@ -961,12 +962,14 @@ hr {
   width: 100% !important;
   min-width: 0;
   margin: 0 !important;
+  padding: 0 !important;
 }
 
 .cs-user-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 4px;
+  padding-top: 10px;
+  margin-top: 2px;
 }
 
 .cs-user-copy {
@@ -1256,6 +1259,11 @@ hr {
 }
 
 /* --- Follow-Up Section, Quick Chips & Inline Reply Prompt --- */
+.stApp [data-testid="stElementContainer"]:has(.followup-label) {
+  margin-top: 14px !important;
+  margin-bottom: 6px !important;
+}
+
 .followup-label {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -1263,7 +1271,14 @@ hr {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
-  margin: 6px 0 4px;
+  line-height: 1.2;
+  margin: 0;
+  padding: 12px 0 6px;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.st-key-qa_ai_followup {
+  margin-bottom: 8px !important;
 }
 
 .st-key-qa_ai_followup button {
@@ -1273,9 +1288,9 @@ hr {
   border-radius: 5px;
   border: 1.5px solid var(--accent);
   background: var(--accent-light);
-  padding: 0.45rem 0.9rem;
-  min-height: 2.5rem;
-  margin-bottom: 2px;
+  padding: 0.55rem 0.95rem;
+  min-height: 2.6rem;
+  margin-bottom: 0;
   transition: background-color 0.15s ease, transform 0.12s ease, box-shadow 0.12s ease;
   cursor: pointer;
 }
@@ -1303,7 +1318,7 @@ hr {
 .st-key-qa_chips [data-testid="stHorizontalBlock"] {
   flex-direction: row !important;
   flex-wrap: wrap !important;
-  gap: 0.45rem !important;
+  gap: 0.55rem !important;
 }
 
 .st-key-qa_chips [data-testid="stColumn"] {
@@ -2283,8 +2298,13 @@ div[role="dialog"] button[aria-label="Close"] svg {
   .stApp [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]),
   .stApp [data-testid="stChatMessage"]:has(.cs-user-actions) {
     max-width: 88% !important;
-    padding: 12px 15px 10px !important;
+    padding: 13px 15px 11px !important;
     border-radius: 14px 14px 4px 14px !important;
+  }
+  .cs-user-copy {
+    min-height: 36px;
+    padding: 5px 12px;
+    font-size: 0.72rem;
   }
   .stMarkdown table {
     display: block;
@@ -2293,18 +2313,26 @@ div[role="dialog"] button[aria-label="Close"] svg {
     white-space: nowrap;
   }
   .cs-act-btn {
-    min-height: 38px;
-    padding: 6px 12px;
+    min-height: 44px;
+    padding: 8px 14px;
   }
   .cs-act-btn.cs-icon-btn {
-    width: 38px;
-    height: 38px;
-    min-height: 38px;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
     padding: 0;
   }
+  [class*="st-key-reply_btn_"] button {
+    min-height: 44px !important;
+    padding: 0 0.85rem !important;
+  }
+  .cs-share-menu {
+    max-width: calc(100vw - 2rem);
+    box-sizing: border-box;
+  }
   .cs-share-item {
-    min-height: 36px;
-    padding: 6px 12px;
+    min-height: 42px;
+    padding: 8px 14px;
   }
   .st-key-qa_chips [data-testid="stColumn"] {
     flex: 1 1 calc(50% - 0.5rem) !important;
@@ -2320,7 +2348,7 @@ div[role="dialog"] button[aria-label="Close"] svg {
   [data-testid="stBottomBlockContainer"] {
     padding-left: 0.85rem !important;
     padding-right: 0.85rem !important;
-    padding-bottom: 1rem !important;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
   }
   [data-testid="stChatInput"] > div {
     border-radius: 15px !important;
@@ -2340,6 +2368,13 @@ div[role="dialog"] button[aria-label="Close"] svg {
   .st-key-sports_row button span[data-testid="stIconMaterial"] {
     display: none;
   }
+  .stApp .st-key-hero [class*="st-key-sp_"] button {
+    padding: 0 0.35rem;
+  }
+  .stApp .st-key-hero [class*="st-key-sp_"] button p {
+    font-size: 0.88rem;
+    white-space: nowrap;
+  }
   .brand-logo {
     width: 34px;
     height: 34px;
@@ -2352,6 +2387,150 @@ div[role="dialog"] button[aria-label="Close"] svg {
 @media (max-width: 390px) {
   .stApp .st-key-dark label p {
     font-size: 0.82rem;
+  }
+  .st-key-sports_row [data-testid="stHorizontalBlock"] {
+    gap: 0.35rem;
+  }
+  .stApp .st-key-hero [class*="st-key-sp_"] button p {
+    font-size: 0.82rem;
+  }
+}
+
+/* --- Sport Bouncing Ball Loader --- */
+.stApp [data-testid="stChatMessage"]:has(.cs-loader) {
+  align-items: center !important;
+  padding-top: 16px !important;
+  padding-bottom: 16px !important;
+}
+
+.stApp [data-testid="stChatMessage"]:has(.cs-loader) [data-testid="stMarkdownContainer"] {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100%;
+}
+
+.cs-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  gap: 11px;
+  padding: 2px 0;
+  margin: 0;
+}
+
+.stApp [data-testid="stChatMessage"] .cs-loader {
+  padding-right: 48px;
+}
+
+.cs-loader.cs-loader-card {
+  display: flex;
+  justify-content: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 2.5px solid var(--accent);
+  border-radius: 6px;
+  padding: 20px 24px;
+  margin: 6px 0 14px;
+  box-shadow: var(--card-shadow);
+}
+
+.cs-ball-stage {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 34px;
+  height: 38px;
+  flex-shrink: 0;
+}
+
+.cs-ball {
+  position: relative;
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  margin-bottom: 4px;
+  transform-origin: center bottom;
+  animation: cs-ball-bounce 0.72s cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
+  will-change: transform;
+}
+
+.cs-ball-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  animation: cs-ball-spin 1.9s linear infinite;
+  will-change: transform;
+}
+
+.cs-ball-shadow {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 20px;
+  height: 4px;
+  margin-left: -10px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.24);
+  filter: blur(1px);
+  transform-origin: center center;
+  animation: cs-shadow-pulse 0.72s cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
+  will-change: transform, opacity;
+}
+
+.cs-loader-text {
+  font-family: var(--font-body);
+  font-size: 0.93rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--muted);
+  letter-spacing: -0.005em;
+  padding-top: 3px;
+}
+
+@media (max-width: 640px) {
+  .stApp [data-testid="stChatMessage"] .cs-loader {
+    padding-right: 28px;
+  }
+}
+
+@keyframes cs-ball-bounce {
+  0%, 100% {
+    transform: translateY(0) scaleX(1.13) scaleY(0.85);
+  }
+  14% {
+    transform: translateY(-3px) scaleX(0.93) scaleY(1.08);
+  }
+  48% {
+    transform: translateY(-11px) scaleX(1) scaleY(1);
+  }
+  86% {
+    transform: translateY(-2px) scaleX(0.96) scaleY(1.05);
+  }
+}
+
+@keyframes cs-ball-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes cs-shadow-pulse {
+  0%, 100% {
+    transform: scaleX(1.14);
+    opacity: 0.52;
+  }
+  48% {
+    transform: scaleX(0.54);
+    opacity: 0.16;
   }
 }
 
@@ -2442,6 +2621,76 @@ def _brand_logo_bg(sport="Basketball", dark=False):
     return f'url("data:image/svg+xml;base64,{b64}")'
 
 
+_BALL_SHAPES = {
+    "Basketball": (
+        "<circle cx='24' cy='24' r='20.5'/>"
+        "<g clip-path='url(#cs-ball-clip)'>"
+        "<path d='M3.5 24H44.5'/>"
+        "<path d='M24 3.5V44.5'/>"
+        "<path d='M10.5 8.5C18.5 16.5 18.5 31.5 10.5 39.5'/>"
+        "<path d='M37.5 8.5C29.5 16.5 29.5 31.5 37.5 39.5'/>"
+        "</g>"
+    ),
+    "Volleyball": (
+        "<circle cx='24' cy='24' r='20.5'/>"
+        "<g clip-path='url(#cs-ball-clip)'>"
+        "<path d='M24 24Q20 13.5 24 3.5'/>"
+        "<path d='M24 24Q34 25.5 41.8 34.2'/>"
+        "<path d='M24 24Q15 30 6.2 34.2'/>"
+        "<path d='M23 14.5Q33 13 43.5 20.5'/>"
+        "<path d='M24.5 8.5Q34 7.5 41 13'/>"
+        "<path d='M33.5 29.5Q24 36 14.5 29.5'/>"
+        "<path d='M37.5 36.5Q24 43 10.5 36.5'/>"
+        "<path d='M14.5 29Q11 19 16 8.5'/>"
+        "<path d='M8.8 27Q6.2 18 11 10.5'/>"
+        "</g>"
+    ),
+    "Football": (
+        "<circle cx='24' cy='24' r='20.5'/>"
+        "<g clip-path='url(#cs-ball-clip)'>"
+        "<polygon points='24,16 31.6,21.5 28.7,30.4 19.3,30.4 16.4,21.5'/>"
+        "<path d='M24 16V9.2M18.5 6.2L24 9.2L29.5 6.2'/>"
+        "<path d='M31.6 21.5L38.2 19.4M39.5 13.2L38.2 19.4L42.8 23.6'/>"
+        "<path d='M28.7 30.4L32.8 36.2M38.8 35.6L32.8 36.2L30.2 41.8'/>"
+        "<path d='M19.3 30.4L15.2 36.2M17.8 41.8L15.2 36.2L9.2 35.6'/>"
+        "<path d='M16.4 21.5L9.8 19.4M5.2 23.6L9.8 19.4L8.5 13.2'/>"
+        "</g>"
+    ),
+}
+
+
+def _ball_svg(sport="Basketball", stroke="#C94A12"):
+    shapes = _BALL_SHAPES.get(sport, _BALL_SHAPES["Basketball"])
+    return (
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' "
+        f"fill='none' stroke='{stroke}' stroke-width='2.3' "
+        "stroke-linecap='round' stroke-linejoin='round'>"
+        "<defs><clipPath id='cs-ball-clip'><circle cx='24' cy='24' r='20.5'/></clipPath></defs>"
+        f"{shapes}</svg>"
+    )
+
+
+def _ball_svg_bg(sport="Basketball", stroke="#C94A12"):
+    b64 = base64.b64encode(_ball_svg(sport, stroke).encode("utf-8")).decode("ascii")
+    return f'url("data:image/svg+xml;base64,{b64}")'
+
+
+def loading_ball_html(sport="Basketball", label="Generating response…", card=False):
+    """Return single-line HTML for a sport-specific bouncing ball loader."""
+    slug = sport.lower() if sport in _BALL_SHAPES else "basketball"
+    cls = "cs-loader cs-loader-card" if card else "cs-loader"
+    safe_label = html.escape(label or "")
+    return (
+        f'<div class="{cls}" role="status" aria-live="polite">'
+        f'<span class="cs-ball-stage" aria-hidden="true">'
+        f'<span class="cs-ball"><span class="cs-ball-art cs-ball-{slug}"></span></span>'
+        f'<span class="cs-ball-shadow"></span>'
+        f'</span>'
+        f'<span class="cs-loader-text">{safe_label}</span>'
+        f'</div>'
+    )
+
+
 def get_css(sport="Basketball", topic="Rules", dark=False):
     mode = "dark" if dark else "light"
     theme = {**BASE[mode], **THEMES.get(sport, THEMES["Basketball"])[mode]}
@@ -2459,6 +2708,7 @@ def get_css(sport="Basketball", topic="Rules", dark=False):
         "background-position:center top,left bottom,right bottom,center top;"
         "background-repeat:no-repeat,no-repeat,no-repeat,repeat;"
         "background-attachment:fixed,fixed,fixed,fixed;}"
+        "@media (max-width:768px){.stApp{background-attachment:scroll,scroll,scroll,scroll;}}"
     )
     hero_bg = (
         ".st-key-hero{"
@@ -2479,8 +2729,13 @@ def get_css(sport="Basketball", topic="Rules", dark=False):
     )
     active_btn_art = _sport_btn_bg(sport if sport in _BTN_ART_SHAPES else "Basketball", theme["hero"], 0.16)
     m, acc = theme["muted"], theme["accent-text"]
+    ball_css = "".join(
+        f".cs-ball-{name.lower()}{{background-image:{_ball_svg_bg(name, THEMES[name][mode]['accent-text'])};}}"
+        for name in _BALL_SHAPES
+    )
     icons_css = (
         f".brand-logo{{background-image:{_brand_logo_bg(sport, dark)};}}"
+        f"{ball_css}"
         f".cs-ic-copy{{background-image:{_svg_bg('copy', m)};}}"
         f".cs-ic-paste{{background-image:{_svg_bg('paste', m)};}}"
         f".cs-ic-share{{background-image:{_svg_bg('share', m)};}}"
