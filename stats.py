@@ -113,14 +113,20 @@ BB_CAREER_FIELDS = [
 ]
 FB_FIELDS = [
     ("appearances", "Appearances"), ("totalGoals", "Goals"),
-    ("goalAssists", "Assists"), ("totalShots", "Shots"),
-    ("shotsOnTarget", "Shots on target"), ("bigChanceCreated", "Big chances created"),
-    ("penaltyKickGoals", "Penalty goals"), ("yellowCards", "Yellow cards"),
+    ("goalAssists", "Assists"), ("saves", "Saves"),
+    ("cleanSheet", "Clean sheets"), ("goalsConceded", "Goals conceded"),
+    ("totalShots", "Shots"), ("shotsOnTarget", "Shots on target"),
+    ("bigChanceCreated", "Big chances created"), ("penaltyKickGoals", "Penalty goals"),
+    ("yellowCards", "Yellow cards"),
 ]
+_FB_GK_KEYS = {"saves", "cleanSheet", "goalsConceded", "SV", "CS", "GA"}
 FB_CAREER_FIELDS = [
     ("STRT", "Career starts"),
     ("G", "Career goals"),
     ("A", "Career assists"),
+    ("SV", "Career saves"),
+    ("CS", "Career clean sheets"),
+    ("GA", "Career goals conceded"),
     ("SHOT", "Career shots"),
     ("SOG", "Career shots on target"),
     ("YC", "Career yellow cards"),
@@ -130,6 +136,9 @@ FB_RAW_FIELDS = [
     ("STRT", "Starts"),
     ("G", "Goals"),
     ("A", "Assists"),
+    ("SV", "Saves"),
+    ("CS", "Clean sheets"),
+    ("GA", "Goals conceded"),
     ("SHOT", "Shots"),
     ("SOG", "Shots on target"),
     ("YC", "Yellow cards"),
@@ -138,6 +147,10 @@ FB_RAW_FIELDS = [
     ("FA", "Fouls suffered"),
     ("OFF", "Offsides"),
 ]
+_FB_SLUG_NAMES = {
+    path.split("/", 1)[1]: label
+    for path, label in ESPN_LEAGUES["Football"].values()
+}
 
 
 class _FetchError(Exception):
@@ -172,10 +185,13 @@ def _today():
     return datetime.now(timezone.utc).date().isoformat()
 
 
+_CALENDAR_LEAGUES = ("basketball/wnba", "soccer/usa.1", "soccer/bra.1")
+
+
 def _season_year(path):
-    """ESPN labels NBA seasons by ending year, soccer seasons by starting year, WNBA by calendar year."""
+    """ESPN labels NBA/NCAA by ending year, split-year soccer by starting year, and calendar leagues by year."""
     now = datetime.now(timezone.utc)
-    if path.startswith("basketball/wnba"):
+    if path in _CALENDAR_LEAGUES:
         return now.year
     if path.startswith("basketball"):
         return now.year + 1 if now.month >= 9 else now.year
@@ -183,7 +199,7 @@ def _season_year(path):
 
 
 def _season_label(path, year):
-    if path.startswith("basketball/wnba"):
+    if path in _CALENDAR_LEAGUES:
         return str(year)
     if path.startswith("basketball"):
         return f"{year - 1}-{str(year)[2:]}"
@@ -317,55 +333,61 @@ def _player_stats_raw(path, player_id, year):
 
 
 @_cached(ttl=3600)
-def _soccer_player_stats_raw(player_id, target_year=None):
+def _soccer_player_stats_raw(player_id, target_year=None, pref_slug=""):
     url = f"https://site.web.api.espn.com/apis/common/v3/sports/soccer/athletes/{player_id}/stats"
     data = _get_json(url)
     if data is None:
         raise _FetchError()
-    cats = data.get("categories", [])
+    cats = data.get("categories") or []
     if not cats:
         return None
-    names = cats[0].get("names", [])
-    stats_list = cats[0].get("statistics", [])
-    if not stats_list:
+
+    merged = {}
+    order = []
+    for cat in cats:
+        names = cat.get("names") or []
+        for s in cat.get("statistics") or []:
+            season = s.get("season") or {}
+            yr = season.get("year")
+            if target_year is not None and yr != target_year:
+                continue
+            disp = season.get("displayName") or (season.get("type") or {}).get("name") or "Season"
+            league_slug = s.get("leagueSlug") or ""
+            key = (yr, league_slug, disp)
+            if key not in merged:
+                merged[key] = {"year": yr, "disp": disp, "league_slug": league_slug, "stats": {}}
+                order.append(key)
+            merged[key]["stats"].update(dict(zip(names, s.get("stats") or [])))
+
+    if not order:
         return None
 
-    matching = []
-    for s in stats_list:
-        yr = (s.get("season") or {}).get("year")
-        if target_year is not None:
-            if yr == target_year:
-                matching.append(s)
-        else:
-            matching.append(s)
+    def _priority(rec):
+        slug = rec["league_slug"].lower()
+        disp_l = rec["disp"].lower()
+        raw_strt = str(rec["stats"].get("STRT", ""))
+        starts = int(raw_strt) if raw_strt.isdigit() else 0
+        exact = 1 if pref_slug and slug == pref_slug.lower() else 0
+        domestic = 1 if slug.endswith(".1") else 0
+        known_league = 1 if slug in _FB_SLUG_NAMES else 0
+        comp_kw = 1 if known_league or any(w in disp_l for w in ("regular", "league")) else 0
+        return (exact, domestic, comp_kw, starts)
 
-    if not matching and target_year is not None:
-        return None
-
-    chosen = matching[0] if matching else None
-    for s in matching:
-        disp = ((s.get("season") or {}).get("displayName") or
-                ((s.get("season") or {}).get("type") or {}).get("name") or "").lower()
-        if any(w in disp for w in ("regular", "league", "laliga", "premier", "serie a", "bundesliga", "mls", "saudi", "champions")):
-            chosen = s
-            break
-
-    if not chosen:
-        return None
-
-    yr = (chosen.get("season") or {}).get("year")
-    disp = (chosen.get("season") or {}).get("displayName") or ((chosen.get("season") or {}).get("type") or {}).get("name") or "Season"
-    league_slug = chosen.get("leagueSlug") or ""
+    best_key = max(order, key=lambda k: _priority(merged[k]))
+    chosen = merged[best_key]
+    yr = chosen["year"]
+    disp = chosen["disp"]
+    league_slug = chosen["league_slug"]
     if disp.lower() == "regular season" and league_slug:
-        disp = f"{league_slug.upper()} Regular Season"
-    stat_map = dict(zip(names, chosen.get("stats", [])))
-    return {"year": yr, "competition": disp, "league_slug": league_slug, "stats": stat_map}
+        nice_lg = _FB_SLUG_NAMES.get(league_slug, league_slug.upper())
+        disp = f"{yr} {nice_lg} {disp}" if yr and str(yr) not in disp else f"{nice_lg} {disp}"
+    return {"year": yr, "competition": disp, "league_slug": league_slug, "stats": chosen["stats"]}
 
 
 @_cached(ttl=86400)
 def _player_career_raw(sport, player_id, league_slug=""):
     if sport == "Basketball":
-        sub = "wnba" if league_slug == "wnba" else "nba"
+        sub = league_slug if league_slug in ("nba", "wnba", "mens-college-basketball", "womens-college-basketball") else "nba"
         url = f"https://site.web.api.espn.com/apis/common/v3/sports/basketball/{sub}/athletes/{player_id}/overview"
         data = _get_json(url)
         if data is None:
@@ -384,15 +406,21 @@ def _player_career_raw(sport, player_id, league_slug=""):
         cats = data.get("categories", [])
         if not cats:
             return None
-        stats_list = cats[0].get("statistics", [])
-        names = cats[0].get("names", [])
         totals = {}
-        for s in stats_list:
-            for n, val in zip(names, s.get("stats", [])):
-                try:
-                    totals[n] = totals.get(n, 0) + int(val)
-                except (ValueError, TypeError):
-                    pass
+        slugs_seen = set()
+        for cat in cats:
+            names = cat.get("names", [])
+            for s in cat.get("statistics", []):
+                if s.get("leagueSlug"):
+                    slugs_seen.add(s["leagueSlug"])
+                for n, val in zip(names, s.get("stats", [])):
+                    try:
+                        totals[n] = totals.get(n, 0) + int(val)
+                    except (ValueError, TypeError):
+                        pass
+        if totals and len(slugs_seen) == 1:
+            only_slug = next(iter(slugs_seen))
+            totals["_scope"] = _FB_SLUG_NAMES.get(only_slug, only_slug.upper())
         return totals if totals else None
     return None
 
@@ -413,32 +441,48 @@ def _player_block(sport, path, label, player, season=None):
     fb_data = None
     if sport == "Football" and not data:
         # Fall back to global soccer stats endpoint covering MLS, Saudi Pro League, Liga MX, etc.
-        fb_data = _soccer_player_stats_raw(player["id"], target_year)
+        pref_slug = path.split("/", 1)[1] if "/" in path else ""
+        fb_data = _soccer_player_stats_raw(player["id"], target_year, pref_slug=pref_slug)
         if not fb_data and not is_past:
-            fb_data = _soccer_player_stats_raw(player["id"], target_year - 1)
+            fb_data = _soccer_player_stats_raw(player["id"], target_year - 1, pref_slug=pref_slug)
 
     rows = []
     if data:
         fields = BB_FIELDS if sport == "Basketball" else FB_FIELDS
+        is_gk = sport == "Football" and (
+            (data["stats"].get("saves") or {}).get("displayValue") not in (None, "", "0")
+        )
         for key, nice in fields:
+            if key in _FB_GK_KEYS and not is_gk:
+                continue
             s = data["stats"].get(key)
             if not s or s.get("displayValue") in (None, ""):
                 continue
             value = s["displayValue"]
+            if is_gk and key in ("totalGoals", "totalShots", "shotsOnTarget") and str(value) in ("0", "0.0"):
+                continue
             if sport == "Basketball" and s.get("rankDisplayValue") and key.startswith("avg"):
                 value = f"{value} ({s['rankDisplayValue']})"
             rows.append((player["name"], nice, value))
     elif fb_data:
+        is_gk = str(fb_data["stats"].get("SV") or "0") not in ("0", "", "0.0")
         for key, nice in FB_RAW_FIELDS:
+            if key in _FB_GK_KEYS and not is_gk:
+                continue
             val = fb_data["stats"].get(key)
-            if val not in (None, "", "0") or key in ("STRT", "G", "A"):
+            if is_gk and key in ("G", "SHOT", "SOG", "OFF") and str(val) in ("0", "0.0"):
+                continue
+            if val not in (None, "", "0") or key in ("STRT", "G", "A") or (is_gk and key in ("SV", "CS", "GA")):
                 rows.append((player["name"], nice, val))
 
     blocks = []
     if rows:
+        cur_label = _season_label(path, _season_year(path))
         if data:
+            got_label = _season_label(path, data["year"])
+            ctx_note = f" (current {label} season is {cur_label})" if got_label != cur_label else ""
             head = (f"Player season stats: {player['name']}, {label} "
-                    f"{_season_label(path, data['year'])} regular season. "
+                    f"{got_label} regular season{ctx_note}. "
                     f"Source: ESPN, retrieved {_today()}.")
         else:
             head = (f"Player season stats: {player['name']}, {fb_data['competition']}. "
@@ -460,11 +504,25 @@ def _player_block(sport, path, label, player, season=None):
     if career:
         career_rows = []
         c_fields = BB_CAREER_FIELDS if sport == "Basketball" else FB_CAREER_FIELDS
+        is_gk_c = sport == "Football" and career.get("SV") not in (None, "", "0", 0)
         for k, nice in c_fields:
+            if k in _FB_GK_KEYS and not is_gk_c:
+                continue
+            if is_gk_c and k in ("G", "SHOT", "SOG") and career.get(k) in (0, "0"):
+                continue
             if k in career and career[k] not in (None, ""):
                 career_rows.append((player["name"], nice, career[k]))
         if career_rows:
-            source_label = "WNBA" if league_slug == "wnba" else ("NBA" if sport == "Basketball" else "club & international")
+            if league_slug == "wnba":
+                source_label = "WNBA"
+            elif league_slug in ("mens-college-basketball", "womens-college-basketball"):
+                source_label = "NCAA"
+            elif sport == "Basketball":
+                source_label = "NBA"
+            elif career.get("_scope"):
+                source_label = f"{career['_scope']} (ESPN recorded)"
+            else:
+                source_label = "club & international"
             c_head = (f"Player career stats: {player['name']}, {source_label} career totals. "
                       f"Source: ESPN, retrieved {_today()}.")
             blocks.append(c_head + "\n" + _table(["Player", "Stat", "Value"], career_rows))
@@ -739,16 +797,16 @@ def _vb_block(route, key):
 
     if kind in ("player", "leaders"):
         target_name = ", ".join(names) if names else (player_name or "the player")
-        s_desc = f"{req_season} season" if req_season else "current/recent seasons"
+        s_desc = f"{req_season} season" if req_season else "current or recent seasons"
         return (
-            f"Volleyball player profile and season metrics: {target_name} ({s_desc}).\n"
-            f"Provide {target_name}'s known competitive profile for the {s_desc}: position, club team, "
-            f"national team achievements, key per-set and tournament metrics (such as attack efficiency / "
-            f"hitting percentage, kills per set, service aces, block touches, and scoring leadership), "
-            f"and major tournament honors (e.g. VNL, Olympics, SuperLega, World Championship). "
-            f"Present their statistical performance cleanly in a summary table (Player | Stat | Value or Note). "
-            f"At the end, invite the user to attach an official box score or match sheet using the + button "
-            f"for granular point-by-point match analysis."
+            f"Live per-player volleyball box-score feed is unavailable for {target_name} ({s_desc}): "
+            f"API-Volleyball provides league standings and match results, not individual player stats.\n"
+            f"Tell the user clearly that live {s_desc} player metrics are not in the app's feed "
+            f"(do NOT estimate or invent per-set figures such as kills/set, hitting %, or aces/set). "
+            f"Share only well-established facts you are confident about for {target_name} (position, role, "
+            f"and verified career or tournament honors), explain the key stats to look for in this role "
+            f"(kills, hitting %, aces, blocks, digs), point them to official Volleyball World (FIVB), "
+            f"SuperLega, or PlusLiga stats leaders, and invite them to attach a box score with the + button."
         )
     if not key:
         return ("Live volleyball league data is not configured (needs a free API-Sports "
@@ -861,7 +919,7 @@ Reply with ONLY one JSON object, no prose:
 {{"kind": "player"|"standings"|"leaders"|"none", "names": [], "league": "", "stat": "", "team": "", "season": ""}}
 Rules:
 - "player": the user wants a specific player's numbers (current season, previous
-  season, or career/all-time). names = up to 3 full player names (guess the full
+  season, or career/all-time). names = up to 8 full player names (guess the full
   name, e.g. "LeBron" -> "LeBron James", or resolve pronouns like "he", "his",
   "him" from recent conversation context).
 - "standings": the user wants a league table / standings / who is first
@@ -881,12 +939,15 @@ Rules:
   named, use "".
 - team: only for standings, a team the user asks about (else "").
 - season: if the user asked about a specific season or past season, return the
-  season year or label (e.g. "2023", "2024-25", "last", "2 seasons ago"), else "".
+  explicit year/label (e.g. "2023", "2024-25"); for relative phrases ("last
+  season", "last last season", "two seasons ago"), preserve the relative phrase
+  verbatim (e.g. "last", "last last", "two seasons ago") so the app resolves it
+  against today's date, else "".
 """
 
 
 def _call_router(client, model, provider, msgs):
-    token_kw = {"max_completion_tokens": 150} if provider == "openai" else {"max_tokens": 200}
+    token_kw = {"max_completion_tokens": 800} if provider == "openai" else {"max_tokens": 1024}
     try:
         return client.chat.completions.create(
             model=model, temperature=0, messages=msgs, **token_kw,

@@ -8,6 +8,7 @@ import os
 import random
 import re
 import sys
+from datetime import date
 from pathlib import Path
 from urllib.parse import quote
 
@@ -29,6 +30,7 @@ except ImportError:
     Groq = None
 
 import defenses
+import ratelimit
 import stats
 from prompts import build_quiz_prompt, build_system_prompt
 from styles import brand_logo_svg, get_css, loading_ball_html
@@ -143,6 +145,18 @@ ss.setdefault("quiz_pending", {})  # sport -> True when a new quiz should be gen
 ss.setdefault("quiz_error", {})    # sport -> last generation error
 ss.setdefault("quiz_seen", {})     # sport -> recent question texts (avoid repeats)
 ss.setdefault("unavailable_models", set())  # models that returned 404 model_not_found
+
+quota = ratelimit.status()
+if ss.pop("_cs_new_cookie", False):
+    if _SUPPORTS_INLINE_JS:
+        st.html(
+            f'<script>document.cookie="cs_client_id={ratelimit.client_id()};'
+            f'path=/;max-age=31536000;SameSite=Lax"</script>',
+            unsafe_allow_javascript=True,
+        )
+    else:
+        # JS unavailable — persist the client id in query params as fallback
+        st.query_params["cs_client_id"] = ratelimit.client_id()
 
 
 sport = ss.sport
@@ -476,13 +490,62 @@ def reply_dialog(idx):
         st.rerun()
 
 
+def quota_banner_html(quota_state, topic_now=None, compact=False):
+    """Return themed warning/limit banner HTML when near or at daily limit, else ''."""
+    used, limit, remaining, warn, blocked = quota_state
+    if not (warn or blocked):
+        return ""
+    if blocked:
+        cls, badge, role = "is-error", "LIMIT REACHED", "alert"
+        if compact:
+            msg = f"<strong>Daily limit reached ({used}/{limit}).</strong> Resets at local midnight."
+        else:
+            msg = f"<strong>You've used all {limit} prompts for today.</strong> Prompts reset at local midnight."
+    else:
+        cls, badge, role = "is-warn", f"{remaining} LEFT", "status"
+        noun = "prompt" if remaining == 1 else "prompts"
+        if compact:
+            msg = f"<strong>Almost at today's limit:</strong> {remaining} {noun} left today."
+        else:
+            msg = (f"<strong>Almost at today's prompt limit:</strong> {used} of {limit} used, "
+                   f"{remaining} {noun} left. Resets at local midnight.")
+    extra = " is-sidebar" if compact else (" is-quiz" if topic_now == "Quiz" else "")
+    return (
+        f'<div class="cs-quota-banner {cls}{extra}" role="{role}" aria-live="polite">'
+        f'<span class="cs-quota-badge">{badge}</span>'
+        f'<span class="cs-quota-text">{msg}</span>'
+        f'</div>'
+    )
+
+
+def maybe_toast_quota(quota_state):
+    """Show a one-time toast when entering warning, final prompt, or limit-reached state."""
+    used, limit, remaining, warn, blocked = quota_state
+    if not (warn or blocked):
+        return
+    state = "blocked" if blocked else ("last" if remaining == 1 else "warn")
+    marker = f"{date.today().isoformat()}:{state}"
+    if ss.get("_cs_quota_toast") == marker:
+        return
+    ss["_cs_quota_toast"] = marker
+    if blocked:
+        st.toast(f"Daily prompt limit reached ({used}/{limit}). Prompts reset at local midnight.",
+                 icon=":material/block:")
+    elif remaining == 1:
+        st.toast(f"1 prompt left for today ({used}/{limit} used). Prompts reset at local midnight.",
+                 icon=":material/warning:")
+    else:
+        st.toast(f"Almost at today's prompt limit: {remaining} prompts left today.",
+                 icon=":material/warning:")
+
+
 def render_message_tools(idx, msg):
     """Icon toolbar (copy / paste / share) and a Reply button, shown below an assistant card."""
     prev_q = ss.messages[idx - 1]["content"] if idx > 0 and ss.messages[idx - 1]["role"] == "user" else ""
     with st.container(key=f"tools_{idx}", horizontal=True, vertical_alignment="center", gap="small"):
         render_assistant_actions(idx, msg["content"], prev_q)
         if not msg.get("blocked"):
-            if st.button("Reply", key=f"reply_btn_{idx}", icon=":material/reply:",
+            if st.button("Reply", key=f"reply_btn_{idx}", icon=":material/reply:", disabled=quota[4],
                          help="Reply or ask a follow-up about this answer"):
                 reply_dialog(idx)
 
@@ -506,6 +569,8 @@ def set_topic(name):
 def start_quiz():
     """Jump to the Quiz tab for this sport and generate a fresh, random quiz."""
     ss.topic = "Quiz"
+    if ratelimit.status()[4]:
+        return  # already at the limit — the banner covers Quiz mode too
     ss.quiz_pending[ss.sport] = True
     ss.quiz_error.pop(ss.sport, None)
     ss.reply_idx = None
@@ -884,7 +949,8 @@ def render_quiz():
         if error:
             st.error(error, icon=":material/error:")
         st.button("Try again" if error else f"Start the {sport} quiz", key="startquiz", on_click=start_quiz,
-                  icon=":material/refresh:" if error else ":material/play_circle:", use_container_width=True)
+                  icon=":material/refresh:" if error else ":material/play_circle:", disabled=quota[4],
+                  use_container_width=True)
         return
 
     questions, idx, score = quiz["questions"], quiz["idx"], quiz["score"]
@@ -917,7 +983,7 @@ def render_quiz():
         with st.container(key="quiz_end_actions"):
             c1, c2 = st.columns(2)
             c1.button("New random quiz", key="quiz_again", icon=":material/shuffle:", on_click=start_quiz,
-                      use_container_width=True)
+                      disabled=quota[4], use_container_width=True)
             c2.button("Back to Rules", key="quiz_back", icon=":material/gavel:", on_click=set_topic,
                       args=("Rules",), use_container_width=True)
         return
@@ -998,6 +1064,11 @@ with st.sidebar:
     model = st.selectbox("Model", model_options, index=default_model_index(model_options, provider), key="model")
     temperature = st.slider("Temperature", 0.0, 1.0, 0.4, 0.1, key="temp",
                             help="Lower is more consistent. Higher is more varied.")
+    st.caption(f"Prompts today: {quota[0]}/{quota[1]} · resets at local midnight")
+    st.progress(min(1.0, quota[0] / max(1, quota[1])))
+    sidebar_banner = quota_banner_html(quota, compact=True)
+    if sidebar_banner:
+        st.markdown(sidebar_banner, unsafe_allow_html=True)
     st.divider()
     has_content = bool(ss.quizzes.get(sport, {}).get("picks")) if topic == "Quiz" else bool(ss.messages)
     st.download_button("Export this quiz" if topic == "Quiz" else "Export this chat", export_markdown(),
@@ -1018,9 +1089,18 @@ with st.sidebar:
                "API-Sports (volleyball) when available. It does not give betting tips.")
 
 # ---------- input (hidden in Quiz mode: the quiz is button-based) ----------
+maybe_toast_quota(quota)
+_bottom_ctx = getattr(st, "bottom", None) or getattr(st, "_bottom", None)
+banner_html = quota_banner_html(quota, topic_now=topic)
+if topic != "Quiz" and banner_html and _bottom_ctx is not None:
+    with _bottom_ctx:
+        st.markdown(banner_html, unsafe_allow_html=True)
 value = None
 if topic != "Quiz":
-    value = st.chat_input(PLACEHOLDERS[topic], accept_file=True, file_type=["txt", "csv", "md", "pdf"])
+    chat_ph = (f"Daily prompt limit reached ({quota[0]}/{quota[1]}). Resets at local midnight."
+               if quota[4] else PLACEHOLDERS[topic])
+    value = st.chat_input(chat_ph, accept_file=True, file_type=["txt", "csv", "md", "pdf"],
+                          disabled=quota[4])
 text, files, reply_to = None, [], None
 if value:
     text = (getattr(value, "text", None) or "").strip()
@@ -1058,8 +1138,14 @@ if text or files:
     })
     if blocked or reason:
         ss.messages.append({"role": "assistant", "content": reason or defenses.BLOCKED_REPLY, "blocked": True})
+    elif not ratelimit.consume():
+        ss.messages.pop()
+        st.rerun()
     else:
         ss.generate = True
+
+if topic != "Quiz" and banner_html and _bottom_ctx is None:
+    st.markdown(banner_html, unsafe_allow_html=True)
 
 # ---------- hero: title, sport buttons, topic tabs ----------
 with st.container(key="hero"):
@@ -1099,14 +1185,21 @@ if topic == "Quiz":
             unsafe_allow_html=True,
         )
         try:
-            ss.quizzes[sport] = {"questions": generate_quiz(), "idx": 0, "score": 0, "picks": []}
-            ss.quiz_error.pop(sport, None)
+            if not ratelimit.consume():
+                ss.quiz_error[sport] = "You've reached today's prompt limit. Prompts reset at local midnight."
+            else:
+                ss.quizzes[sport] = {"questions": generate_quiz(), "idx": 0, "score": 0, "picks": []}
+                ss.quiz_error.pop(sport, None)
         except Exception as e:
+            ratelimit.refund()
             ss.quizzes.pop(sport, None)
             detail = str(e)[:200] if isinstance(e, ValueError) else f"{type(e).__name__}"
             ss.quiz_error[sport] = f"I couldn't build a quiz just now ({detail})."
         finally:
             quiz_loader.empty()
+        st.rerun()
+    if banner_html:
+        st.markdown(banner_html, unsafe_allow_html=True)
     render_quiz()
 
 # ---------- empty state ----------
@@ -1123,7 +1216,7 @@ elif not ss.messages:
         cols = st.columns(2)
         for i, q in enumerate(STARTERS[sport][topic]):
             cols[i % 2].button(q, key=f"starter_{i}", on_click=queue, args=(q,),
-                               icon=":material/arrow_forward:", use_container_width=True)
+                               icon=":material/arrow_forward:", disabled=quota[4], use_container_width=True)
 
 # ---------- history ----------
 last = len(ss.messages) - 1
@@ -1154,16 +1247,19 @@ for i, m in enumerate(ss.messages if topic != "Quiz" else []):
                         icon=":material/subdirectory_arrow_right:",
                         on_click=queue,
                         args=(f"Yes — {followup_q}",),
+                        disabled=quota[4],
                         use_container_width=True,
                     )
             with st.container(key="qa_chips"):
                 c1, c2, c3 = st.columns(3)
                 c1.button("Show example", key="qa_ex", icon=":material/visibility:", on_click=queue,
-                          args=("Show me one real-game example of that.",), use_container_width=True)
-                c2.button("Explain simpler", key="qa_simple", icon=":material/lightbulb:", on_click=queue,
-                          args=("Explain that again in simpler words.",), use_container_width=True)
-                c3.button("Quiz me", key="qa_quiz", icon=":material/quiz:", on_click=start_quiz,
+                          args=("Show me one real-game example of that.",), disabled=quota[4],
                           use_container_width=True)
+                c2.button("Explain simpler", key="qa_simple", icon=":material/lightbulb:", on_click=queue,
+                          args=("Explain that again in simpler words.",), disabled=quota[4],
+                          use_container_width=True)
+                c3.button("Quiz me", key="qa_quiz", icon=":material/quiz:", on_click=start_quiz,
+                          disabled=quota[4], use_container_width=True)
     # Copy / paste / share icons + Reply button sit below each completed response card
     if not is_user:
         render_message_tools(i, m)
