@@ -994,7 +994,8 @@ if ss.generate and topic != "Quiz":
             live_data = None
             if topic_now == "Stats" or (topic_now != "Quiz" and stats.HINT.search(last_user)):
                 with st.spinner("Fetching live stats…"):
-                    route = stats.route_question(client, sport, ss.messages[-1]["content"], model)
+                    context = "\n".join(f"{m['role'].capitalize()}: {m['content'][:250]}" for m in ss.messages[-4:-1])
+                    route = stats.route_question(client, sport, ss.messages[-1]["content"], model, context=context)
                     live_data = stats.fetch_live_data(sport, route, get_vb_key())
             stream = client.chat.completions.create(
                 model=model, temperature=temperature,
