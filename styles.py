@@ -2007,6 +2007,108 @@ div[role="dialog"] button[aria-label="Close"] svg {
   margin: 0 0 12px;
 }
 
+/* Pull-up drawer docked directly above the chatbox when daily prompts are exhausted */
+[data-testid="stBottomBlockContainer"] [data-testid="stVerticalBlock"]:has(.cs-quota-pullup) {
+  gap: 0 !important;
+}
+
+[data-testid="stBottom"] [data-testid="stElementContainer"]:has(.cs-quota-pullup) {
+  position: relative;
+  z-index: 1;
+  margin-bottom: -10px !important;
+}
+
+[data-testid="stBottom"]:has(.cs-quota-pullup) [data-testid="stElementContainer"]:has([data-testid="stChatInput"]) {
+  position: relative;
+  z-index: 2;
+}
+
+.cs-quota-pullup {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  border-radius: 12px 12px 0 0;
+  border: 1.5px solid rgba(220, 38, 38, 0.48);
+  border-top: 2.5px solid #DC2626;
+  border-left: 1.5px solid rgba(220, 38, 38, 0.48);
+  border-bottom: none;
+  margin: 0 8px;
+  padding: 7px 14px 18px;
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.12);
+  animation: cs-pullup-rise 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.cs-quota-pullup.is-nudge {
+  animation: cs-pullup-nudge 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  border-color: #DC2626;
+}
+
+.cs-pullup-handle {
+  width: 34px;
+  height: 3.5px;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.38);
+  margin: 0 auto 1px;
+}
+
+.cs-pullup-body {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.cs-pullup-body .cs-quota-text {
+  flex: 1 1 240px;
+}
+
+.cs-pullup-meta {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--err-ink);
+  opacity: 0.9;
+  white-space: nowrap;
+}
+
+/* Keep chatbox editable when limit is reached, but visually lock the send button */
+[data-testid="stBottom"]:has(.cs-quota-pullup) [data-testid="stChatInputSubmitButton"],
+[data-testid="stBottom"]:has(.cs-quota-pullup) [data-testid="stChatInputSubmitButton"]:hover,
+[data-testid="stBottom"]:has(.cs-quota-pullup) [data-testid="stChatInputSubmitButton"]:not(:disabled),
+[data-testid="stBottom"]:has(.cs-quota-pullup) [data-testid="stChatInputSubmitButton"]:not(:disabled):hover {
+  background-color: var(--input-btn-disabled-bg) !important;
+  color: var(--input-btn-disabled-fg) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  cursor: not-allowed !important;
+  opacity: 0.75;
+}
+
+@keyframes cs-pullup-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cs-pullup-nudge {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-4px);
+  }
+  65% {
+    transform: translateY(1px);
+  }
+}
+
 /* Theme-aware Toast notifications */
 [data-testid="stToast"] {
   background-color: var(--panel) !important;
@@ -2087,24 +2189,28 @@ div[role="dialog"] button[aria-label="Close"] svg {
   -webkit-text-fill-color: var(--muted) !important;
 }
 
-/* File upload (+) button */
+/* File upload (+) button - matches Send button color */
 [data-testid="stChatInputFileUploadButton"] button {
-  color: var(--muted) !important;
-  background-color: transparent !important;
-  border-radius: 5px !important;
+  background-color: var(--accent) !important;
+  color: #FFFFFF !important;
+  border-radius: 6px !important;
   width: 2.05rem;
   height: 2.05rem;
-  transition: color 0.15s ease, background-color 0.15s ease !important;
+  box-shadow: 0 2px 0 var(--accent-edge) !important;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.12s ease, box-shadow 0.12s ease !important;
 }
 
 [data-testid="stChatInputFileUploadButton"] button:hover:not(:disabled) {
-  color: var(--accent-text) !important;
-  background-color: var(--input-hover-bg) !important;
+  background-color: var(--accent-hover) !important;
+  color: #FFFFFF !important;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 var(--accent-edge) !important;
 }
 
 [data-testid="stChatInputFileUploadButton"] button:disabled {
+  background-color: var(--input-btn-disabled-bg) !important;
   color: var(--input-btn-disabled-fg) !important;
-  background-color: transparent !important;
+  box-shadow: none !important;
 }
 
 /* Submit & Stop buttons */
@@ -2137,7 +2243,8 @@ div[role="dialog"] button[aria-label="Close"] svg {
 }
 
 [data-testid="stChatInput"] button svg {
-  fill: currentColor;
+  fill: currentColor !important;
+  stroke: none !important;
 }
 
 /* Attached file chips & instructions inside chat input */
@@ -2198,7 +2305,10 @@ div[role="dialog"] button[aria-label="Close"] svg {
   background: transparent !important;
   color: var(--ink) !important;
   -webkit-text-fill-color: var(--ink) !important;
-  caret-color: var(--accent) !important;
+  caret-color: transparent !important;
+  cursor: pointer !important;
+  user-select: none;
+  -webkit-user-select: none;
   font-family: var(--font-body);
 }
 
@@ -2207,18 +2317,54 @@ div[role="dialog"] button[aria-label="Close"] svg {
   -webkit-text-fill-color: var(--muted) !important;
 }
 
-.stApp [data-testid="stSelectbox"] button {
+.stApp [data-testid="stSelectbox"] div:has(> input[role="combobox"]) button {
   background: transparent !important;
   color: var(--muted) !important;
 }
 
-.stApp [data-testid="stSelectbox"] button:hover {
+.stApp [data-testid="stSelectbox"] div:has(> input[role="combobox"]) button:hover {
   color: var(--accent-text) !important;
 }
 
-.stApp [data-testid="stSelectbox"] button svg {
+.stApp [data-testid="stSelectbox"] div:has(> input[role="combobox"]) button svg {
   color: inherit !important;
   fill: currentColor !important;
+}
+
+/* --- Widget Help Tooltips (?) (consistent & theme-aware) --- */
+.stApp [data-testid="stTooltipIcon"] button {
+  background: transparent !important;
+  color: var(--muted) !important;
+}
+
+.stApp [data-testid="stTooltipIcon"] svg,
+.stApp [data-testid="stTooltipIcon"] svg.icon {
+  fill: none !important;
+  stroke: var(--muted) !important;
+  color: var(--muted) !important;
+  transition: stroke 0.15s ease, color 0.15s ease;
+}
+
+.stApp [data-testid="stTooltipIcon"]:hover svg,
+.stApp [data-testid="stTooltipIcon"]:hover svg.icon,
+.stApp [data-testid="stTooltipIcon"] button:focus-visible svg {
+  fill: none !important;
+  stroke: var(--accent-text) !important;
+  color: var(--accent-text) !important;
+}
+
+/* Tooltip popup (portaled outside .stApp, so no .stApp prefix) */
+[data-testid="stTooltipContent"] {
+  background-color: var(--panel) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--input-border) !important;
+  box-shadow: var(--card-shadow-hover) !important;
+}
+
+[data-testid="stTooltipContent"] p,
+[data-testid="stTooltipContent"] span,
+[data-testid="stTooltipContent"] li {
+  color: var(--ink) !important;
 }
 
 /* Dropdown menu (portaled outside .stApp, so no .stApp prefix) */
@@ -2275,6 +2421,61 @@ div[role="dialog"] button[aria-label="Close"] svg {
 }
 
 /* --- Sidebar Styling --- */
+/* Sidebar expand/collapse toggles (config.toml uses base="light", so override Emotion's dark fadedText60 icon color) */
+button[data-testid="stExpandSidebarButton"],
+[data-testid="stExpandSidebarButton"] button,
+[data-testid="stSidebarCollapseButton"] button,
+button[data-testid="stSidebarCollapseButton"],
+[data-testid="collapsedControl"] button {
+  color: var(--ink-secondary) !important;
+  background-color: transparent !important;
+  border-radius: 6px !important;
+  transition: color 0.15s ease, background-color 0.15s ease !important;
+}
+
+button[data-testid="stExpandSidebarButton"]:hover,
+[data-testid="stExpandSidebarButton"] button:hover,
+[data-testid="stSidebarCollapseButton"] button:hover,
+button[data-testid="stSidebarCollapseButton"]:hover,
+[data-testid="collapsedControl"] button:hover {
+  color: var(--accent-text) !important;
+  background-color: var(--input-hover-bg) !important;
+}
+
+button[data-testid="stExpandSidebarButton"] span[data-testid="stIconMaterial"],
+[data-testid="stExpandSidebarButton"] button span[data-testid="stIconMaterial"],
+[data-testid="stSidebarCollapseButton"] button span[data-testid="stIconMaterial"],
+button[data-testid="stSidebarCollapseButton"] span[data-testid="stIconMaterial"],
+[data-testid="collapsedControl"] button span[data-testid="stIconMaterial"] {
+  color: var(--ink-secondary) !important;
+}
+
+button[data-testid="stExpandSidebarButton"]:hover span[data-testid="stIconMaterial"],
+[data-testid="stExpandSidebarButton"] button:hover span[data-testid="stIconMaterial"],
+[data-testid="stSidebarCollapseButton"] button:hover span[data-testid="stIconMaterial"],
+button[data-testid="stSidebarCollapseButton"]:hover span[data-testid="stIconMaterial"],
+[data-testid="collapsedControl"] button:hover span[data-testid="stIconMaterial"] {
+  color: var(--accent-text) !important;
+}
+
+button[data-testid="stExpandSidebarButton"] svg,
+[data-testid="stExpandSidebarButton"] button svg,
+[data-testid="stSidebarCollapseButton"] button svg,
+button[data-testid="stSidebarCollapseButton"] svg,
+[data-testid="collapsedControl"] button svg {
+  color: var(--ink-secondary) !important;
+  fill: currentColor !important;
+}
+
+button[data-testid="stExpandSidebarButton"]:hover svg,
+[data-testid="stExpandSidebarButton"] button:hover svg,
+[data-testid="stSidebarCollapseButton"] button:hover svg,
+button[data-testid="stSidebarCollapseButton"]:hover svg,
+[data-testid="collapsedControl"] button:hover svg {
+  color: var(--accent-text) !important;
+  fill: currentColor !important;
+}
+
 [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
   font-family: var(--font-display);
   font-weight: 700;
@@ -2472,6 +2673,15 @@ div[role="dialog"] button[aria-label="Close"] svg {
     padding: 8px 11px;
     font-size: 0.84rem;
     gap: 8px;
+  }
+  .cs-quota-pullup {
+    margin: 0 10px;
+    padding: 7px 12px 20px;
+    gap: 5px;
+    border-radius: 12px 12px 0 0;
+  }
+  [data-testid="stBottom"] [data-testid="stElementContainer"]:has(.cs-quota-pullup) {
+    margin-bottom: -12px !important;
   }
   [data-testid="stChatInput"] > div {
     border-radius: 15px !important;

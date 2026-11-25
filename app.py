@@ -36,6 +36,7 @@ from prompts import build_quiz_prompt, build_system_prompt
 from styles import brand_logo_svg, get_css, loading_ball_html
 
 _SUPPORTS_INLINE_JS = "unsafe_allow_javascript" in inspect.signature(st.html).parameters
+_SELECTBOX_NO_TYPE = {"filter_mode": None} if "filter_mode" in inspect.signature(st.selectbox).parameters else {}
 
 st.set_page_config(
     page_title="CourtSense",
@@ -59,8 +60,8 @@ GROQ_MODELS = [
 ]
 MODELS = OPENAI_MODELS
 PROVIDER_LABELS = {
-    "openai": "OpenAI (Aiki Labs)",
-    "groq": "Groq (Fallback)",
+    "openai": "OpenAI",
+    "groq": "Groq",
 }
 TOPIC_ICONS = {
     "Rules": ":material/gavel:",
@@ -364,6 +365,91 @@ _ACTION_SCRIPT = """
     }
   }, true);
 })();
+
+(function () {
+  if (window.__csQuotaGuardBoundV1) return;
+  window.__csQuotaGuardBoundV1 = true;
+
+  function getPullup() {
+    return document.querySelector('[data-testid="stBottom"] [data-cs-quota-blocked="true"]');
+  }
+
+  function nudgePullup(el) {
+    if (!el) return;
+    el.classList.remove("is-nudge");
+    void el.offsetWidth;
+    el.classList.add("is-nudge");
+    clearTimeout(el._csNudgeTimer);
+    el._csNudgeTimer = setTimeout(() => el.classList.remove("is-nudge"), 450);
+  }
+
+  function targetEl(e) {
+    return e.target instanceof Element ? e.target : (e.target && e.target.parentElement);
+  }
+
+  function syncSubmitLock() {
+    const blocked = Boolean(getPullup());
+    const btn = document.querySelector('[data-testid="stChatInputSubmitButton"]');
+    if (!btn) return;
+    if (blocked) {
+      btn.setAttribute("aria-disabled", "true");
+      btn.setAttribute("title", "Daily prompt limit reached — resets at local midnight");
+    } else if (btn.getAttribute("aria-disabled") === "true") {
+      btn.removeAttribute("aria-disabled");
+      btn.removeAttribute("title");
+    }
+  }
+
+  window.addEventListener("keydown", function (e) {
+    const pullup = getPullup();
+    if (!pullup) return;
+    const el = targetEl(e);
+    if (!el) return;
+    const ta = el.closest('[data-testid="stChatInputTextArea"]');
+    if (ta && e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && !e.isComposing) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      nudgePullup(pullup);
+      return;
+    }
+    const submitBtn = el.closest('[data-testid="stChatInputSubmitButton"]');
+    if (submitBtn && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      nudgePullup(pullup);
+    }
+  }, true);
+
+  window.addEventListener("click", function (e) {
+    const pullup = getPullup();
+    if (!pullup) return;
+    const el = targetEl(e);
+    if (!el) return;
+    const submitBtn = el.closest('[data-testid="stChatInputSubmitButton"]');
+    if (submitBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      nudgePullup(pullup);
+    }
+  }, true);
+
+  let raf = 0;
+  function scheduleSync() {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      syncSubmitLock();
+    });
+  }
+
+  if (document.body) {
+    new MutationObserver(scheduleSync).observe(document.body, { childList: true, subtree: true });
+  }
+  syncSubmitLock();
+})();
 </script>
 """
 
@@ -496,6 +582,21 @@ def quota_banner_html(quota_state, topic_now=None, compact=False):
     if not (warn or blocked):
         return ""
     if blocked:
+        if not compact and topic_now != "Quiz":
+            return (
+                '<div class="cs-quota-banner is-error cs-quota-pullup" role="alert" '
+                'aria-live="polite" data-cs-quota-blocked="true">'
+                '<div class="cs-pullup-handle" aria-hidden="true"></div>'
+                '<div class="cs-pullup-body">'
+                '<span class="cs-quota-badge">DAILY LIMIT REACHED</span>'
+                '<span class="cs-quota-text">'
+                f"<strong>You've used all {limit} prompts for today.</strong> "
+                "You can still draft below, but sending resets at local midnight."
+                '</span>'
+                f'<span class="cs-pullup-meta">{used}/{limit} &middot; Resets 00:00</span>'
+                '</div>'
+                '</div>'
+            )
         cls, badge, role = "is-error", "LIMIT REACHED", "alert"
         if compact:
             msg = f"<strong>Daily limit reached ({used}/{limit}).</strong> Resets at local midnight."
@@ -1042,7 +1143,12 @@ with st.sidebar:
         '</div>',
         unsafe_allow_html=True,
     )
-    level = st.radio("Detail level", LEVELS, key="level")
+    level = st.radio(
+        "Detail level",
+        LEVELS,
+        key="level",
+        help="Controls explanation depth and quiz difficulty. Beginner uses plain language, Intermediate adds sports terminology, and Advanced covers tactical detail.",
+    )
     providers = available_providers()
     if not providers:
         get_client()  # displays configuration error and stops
@@ -1055,13 +1161,20 @@ with st.sidebar:
             format_func=lambda p: PROVIDER_LABELS.get(p, p),
             key="provider",
             help="Primary is OpenAI (Aiki Labs). Groq is used automatically as a fallback if needed.",
+            **_SELECTBOX_NO_TYPE,
         )
     else:
         provider = providers[0]
     model_options = list_chat_models(get_client(provider), provider)
     if ss.get("model") not in model_options:
         ss.pop("model", None)
-    model = st.selectbox("Model", model_options, index=default_model_index(model_options, provider), key="model")
+    model = st.selectbox(
+        "Model",
+        model_options,
+        index=default_model_index(model_options, provider),
+        key="model",
+        **_SELECTBOX_NO_TYPE,
+    )
     temperature = st.slider("Temperature", 0.0, 1.0, 0.4, 0.1, key="temp",
                             help="Lower is more consistent. Higher is more varied.")
     st.caption(f"Prompts today: {quota[0]}/{quota[1]} · resets at local midnight")
@@ -1097,17 +1210,16 @@ if topic != "Quiz" and banner_html and _bottom_ctx is not None:
         st.markdown(banner_html, unsafe_allow_html=True)
 value = None
 if topic != "Quiz":
-    chat_ph = (f"Daily prompt limit reached ({quota[0]}/{quota[1]}). Resets at local midnight."
-               if quota[4] else PLACEHOLDERS[topic])
-    value = st.chat_input(chat_ph, accept_file=True, file_type=["txt", "csv", "md", "pdf"],
-                          disabled=quota[4])
+    value = st.chat_input(PLACEHOLDERS[topic], accept_file=True, file_type=["txt", "csv", "md", "pdf"])
 text, files, reply_to = None, [], None
-if value:
+if value and not quota[4]:
     text = (getattr(value, "text", None) or "").strip()
     files = list(getattr(value, "files", None) or [])
-if ss.queued:
+if ss.queued and not quota[4]:
     text, files, ss.queued = ss.queued, [], None
     reply_to, ss.queued_reply_to = ss.queued_reply_to, None
+elif ss.queued and quota[4]:
+    ss.queued, ss.queued_reply_to = None, None
 
 if text or files:
     text = (text or "Summarize this game from the attached data.")[: defenses.MAX_INPUT_CHARS]
