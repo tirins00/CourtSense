@@ -130,9 +130,7 @@ BASE = {
         "input-btn-disabled-bg": "#E4DED2",
         "input-btn-disabled-fg": "#9A9386",
         "input-chip-bg": "#EAE4D8",
-        "bottom-fade": "linear-gradient(180deg, rgba(243, 239, 231, 0) 0%, rgba(243, 239, 231, 0.94) 30%, #F3EFE7 100%)",
-        "warn-ink": "#92400E",
-        "err-ink": "#991B1B",
+        "bottom-fade": "linear-gradient(180deg, rgba(243, 239, 231, 0) 0%, rgba(243, 239, 231, 0.96) 24%, #F3EFE7 48%, #F3EFE7 100%)",
         "card-shadow": "0 1px 2px rgba(22, 21, 19, 0.05)",
         "card-shadow-hover": "0 6px 18px rgba(22, 21, 19, 0.09)",
     },
@@ -154,9 +152,7 @@ BASE = {
         "input-btn-disabled-bg": "#22252B",
         "input-btn-disabled-fg": "#5A5E66",
         "input-chip-bg": "#22252B",
-        "bottom-fade": "linear-gradient(180deg, rgba(14, 15, 17, 0) 0%, rgba(14, 15, 17, 0.94) 30%, #0E0F11 100%)",
-        "warn-ink": "#FBBF24",
-        "err-ink": "#FCA5A5",
+        "bottom-fade": "linear-gradient(180deg, rgba(14, 15, 17, 0) 0%, rgba(14, 15, 17, 0.96) 24%, #0E0F11 48%, #0E0F11 100%)",
         "card-shadow": "0 1px 3px rgba(0, 0, 0, 0.35)",
         "card-shadow-hover": "0 8px 24px rgba(0, 0, 0, 0.55)",
     },
@@ -436,7 +432,7 @@ html, body, [class*="st-"] {
   line-height: 1.5;
 }
 
-#MainMenu, footer, .stAppDeployButton { visibility: hidden; display: none; }
+#MainMenu, footer, .stAppDeployButton, [class*="viewerBadge"], [class*="creatorBadge"] { visibility: hidden; display: none; }
 header[data-testid="stHeader"] { background: transparent; }
 
 .block-container {
@@ -1926,215 +1922,6 @@ div[role="dialog"] button[aria-label="Close"] svg {
   gap: 0.45rem !important;
 }
 
-.stApp:has([data-testid="stBottom"] .cs-quota-banner) .block-container {
-  padding-bottom: 13rem;
-}
-
-/* --- Prompt Quota Warning & Limit Banners --- */
-.cs-quota-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-radius: 6px;
-  padding: 9px 14px;
-  font-size: 0.9rem;
-  line-height: 1.42;
-  color: var(--ink);
-  box-shadow: var(--card-shadow);
-  margin: 0;
-}
-
-.cs-quota-banner.is-warn {
-  background: linear-gradient(0deg, rgba(217, 119, 6, 0.13), rgba(217, 119, 6, 0.13)), var(--panel);
-  border: 1.5px solid rgba(217, 119, 6, 0.55);
-  border-left: 4px solid #D97706;
-}
-
-.cs-quota-banner.is-error {
-  background: linear-gradient(0deg, rgba(220, 38, 38, 0.12), rgba(220, 38, 38, 0.12)), var(--panel);
-  border: 1.5px solid rgba(220, 38, 38, 0.55);
-  border-left: 4px solid #DC2626;
-}
-
-.cs-quota-badge {
-  display: inline-block;
-  flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 2px 7px;
-  border-radius: 4px;
-  border: 1px solid;
-}
-
-.cs-quota-banner.is-warn .cs-quota-badge {
-  color: var(--warn-ink);
-  border-color: rgba(217, 119, 6, 0.55);
-  background: rgba(217, 119, 6, 0.14);
-}
-
-.cs-quota-banner.is-error .cs-quota-badge {
-  color: var(--err-ink);
-  border-color: rgba(220, 38, 38, 0.55);
-  background: rgba(220, 38, 38, 0.14);
-}
-
-.cs-quota-text {
-  min-width: 0;
-  color: var(--ink);
-}
-
-.cs-quota-banner.is-warn strong {
-  color: var(--warn-ink);
-}
-
-.cs-quota-banner.is-error strong {
-  color: var(--err-ink);
-}
-
-.cs-quota-banner.is-sidebar {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 5px;
-  padding: 8px 10px;
-  font-size: 0.82rem;
-  margin: 6px 0 2px;
-}
-
-.cs-quota-banner.is-quiz {
-  margin: 0 0 12px;
-}
-
-/* Pull-up drawer docked directly above the chatbox when daily prompts are exhausted */
-[data-testid="stBottomBlockContainer"] [data-testid="stVerticalBlock"]:has(.cs-quota-pullup) {
-  gap: 0 !important;
-}
-
-[data-testid="stBottom"] [data-testid="stElementContainer"]:has(.cs-quota-pullup) {
-  position: relative;
-  z-index: 1;
-  margin-bottom: -10px !important;
-}
-
-[data-testid="stBottom"]:has(.cs-quota-pullup) [data-testid="stElementContainer"]:has([data-testid="stChatInput"]) {
-  position: relative;
-  z-index: 2;
-}
-
-.cs-quota-pullup {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  border-radius: 12px 12px 0 0;
-  border: 1.5px solid rgba(220, 38, 38, 0.48);
-  border-top: 2.5px solid #DC2626;
-  border-left: 1.5px solid rgba(220, 38, 38, 0.48);
-  border-bottom: none;
-  margin: 0 8px;
-  padding: 7px 14px 18px;
-  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.12);
-  animation: cs-pullup-rise 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.cs-quota-pullup.is-nudge {
-  animation: cs-pullup-nudge 0.42s cubic-bezier(0.22, 1, 0.36, 1);
-  border-color: #DC2626;
-}
-
-.cs-pullup-handle {
-  width: 34px;
-  height: 3.5px;
-  border-radius: 999px;
-  background: rgba(220, 38, 38, 0.38);
-  margin: 0 auto 1px;
-}
-
-.cs-pullup-body {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 10px;
-}
-
-.cs-pullup-body .cs-quota-text {
-  flex: 1 1 240px;
-}
-
-.cs-pullup-meta {
-  flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--err-ink);
-  opacity: 0.9;
-  white-space: nowrap;
-}
-
-/* Keep chatbox editable when limit is reached, but visually lock the send button */
-[data-testid="stBottom"]:has(.cs-quota-pullup) [data-testid="stChatInputSubmitButton"],
-[data-testid="stBottom"]:has(.cs-quota-pullup) [data-testid="stChatInputSubmitButton"]:hover,
-[data-testid="stBottom"]:has(.cs-quota-pullup) [data-testid="stChatInputSubmitButton"]:not(:disabled),
-[data-testid="stBottom"]:has(.cs-quota-pullup) [data-testid="stChatInputSubmitButton"]:not(:disabled):hover {
-  background-color: var(--input-btn-disabled-bg) !important;
-  color: var(--input-btn-disabled-fg) !important;
-  box-shadow: none !important;
-  transform: none !important;
-  cursor: not-allowed !important;
-  opacity: 0.75;
-}
-
-@keyframes cs-pullup-rise {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes cs-pullup-nudge {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  30% {
-    transform: translateY(-4px);
-  }
-  65% {
-    transform: translateY(1px);
-  }
-}
-
-/* Theme-aware Toast notifications */
-[data-testid="stToast"] {
-  background-color: var(--panel) !important;
-  color: var(--ink) !important;
-  border: 1.5px solid var(--input-border) !important;
-  box-shadow: var(--card-shadow-hover) !important;
-}
-
-[data-testid="stToast"] p,
-[data-testid="stToast"] span {
-  color: var(--ink) !important;
-}
-
-/* Disabled prompt action buttons at quota limit */
-.stApp .st-key-starters button:disabled,
-.stApp .st-key-qa_chips button:disabled,
-.st-key-qa_ai_followup button:disabled,
-.st-key-startquiz button:disabled,
-.st-key-quiz_again button:disabled,
-[class*="st-key-reply_btn_"] button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none !important;
-  box-shadow: none !important;
-}
-
 [data-testid="stChatInput"] {
   background: transparent !important;
   border: none !important;
@@ -2557,6 +2344,16 @@ button[data-testid="stSidebarCollapseButton"]:hover svg,
 }
 
 /* --- Tablet & Mobile Responsiveness --- */
+/* Lift chat composer above Streamlit Community Cloud's bottom-right badge/icons on narrow & mobile screens */
+@media (max-width: 1080px) {
+  .block-container {
+    padding-bottom: 11rem;
+  }
+  [data-testid="stBottomBlockContainer"] {
+    padding-bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
 @media (max-width: 768px) {
   .block-container {
     padding-left: 1rem;
@@ -2570,7 +2367,7 @@ button[data-testid="stSidebarCollapseButton"]:hover svg,
 @media (max-width: 640px) {
   .block-container {
     padding-top: 0.75rem;
-    padding-bottom: 7.5rem;
+    padding-bottom: 10.5rem;
     padding-left: 0.85rem;
     padding-right: 0.85rem;
   }
@@ -2664,24 +2461,7 @@ button[data-testid="stSidebarCollapseButton"]:hover svg,
   [data-testid="stBottomBlockContainer"] {
     padding-left: 0.85rem !important;
     padding-right: 0.85rem !important;
-    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
-  }
-  .stApp:has([data-testid="stBottom"] .cs-quota-banner) .block-container {
-    padding-bottom: 11.5rem;
-  }
-  .cs-quota-banner {
-    padding: 8px 11px;
-    font-size: 0.84rem;
-    gap: 8px;
-  }
-  .cs-quota-pullup {
-    margin: 0 10px;
-    padding: 7px 12px 20px;
-    gap: 5px;
-    border-radius: 12px 12px 0 0;
-  }
-  [data-testid="stBottom"] [data-testid="stElementContainer"]:has(.cs-quota-pullup) {
-    margin-bottom: -12px !important;
+    padding-bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px)) !important;
   }
   [data-testid="stChatInput"] > div {
     border-radius: 15px !important;

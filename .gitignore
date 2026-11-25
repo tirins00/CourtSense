@@ -21,8 +21,3 @@ ENV/
 # IDE & Editor settings
 .vscode/
 .idea/
-
-# Local prompt-usage counters
-.streamlit/prompt_usage.json
-.streamlit/prompt_usage.lock
-prompt_usage.json
