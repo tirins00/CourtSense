@@ -130,7 +130,7 @@ BASE = {
         "input-btn-disabled-bg": "#E4DED2",
         "input-btn-disabled-fg": "#9A9386",
         "input-chip-bg": "#EAE4D8",
-        "bottom-fade": "linear-gradient(180deg, rgba(243, 239, 231, 0) 0%, rgba(243, 239, 231, 0.96) 24%, #F3EFE7 48%, #F3EFE7 100%)",
+        "bottom-fade": "linear-gradient(180deg, rgba(243, 239, 231, 0) 0%, rgba(243, 239, 231, 0.96) 18%, #F3EFE7 34%, #F3EFE7 100%)",
         "card-shadow": "0 1px 2px rgba(22, 21, 19, 0.05)",
         "card-shadow-hover": "0 6px 18px rgba(22, 21, 19, 0.09)",
     },
@@ -152,7 +152,7 @@ BASE = {
         "input-btn-disabled-bg": "#22252B",
         "input-btn-disabled-fg": "#5A5E66",
         "input-chip-bg": "#22252B",
-        "bottom-fade": "linear-gradient(180deg, rgba(14, 15, 17, 0) 0%, rgba(14, 15, 17, 0.96) 24%, #0E0F11 48%, #0E0F11 100%)",
+        "bottom-fade": "linear-gradient(180deg, rgba(14, 15, 17, 0) 0%, rgba(14, 15, 17, 0.96) 18%, #0E0F11 34%, #0E0F11 100%)",
         "card-shadow": "0 1px 3px rgba(0, 0, 0, 0.35)",
         "card-shadow-hover": "0 8px 24px rgba(0, 0, 0, 0.55)",
     },
@@ -2347,10 +2347,10 @@ button[data-testid="stSidebarCollapseButton"]:hover svg,
 /* Lift chat composer above Streamlit Community Cloud's bottom-right badge/icons on narrow & mobile screens */
 @media (max-width: 1080px) {
   .block-container {
-    padding-bottom: 11rem;
+    padding-bottom: 12rem;
   }
-  [data-testid="stBottomBlockContainer"] {
-    padding-bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px)) !important;
+  .stApp [data-testid="stBottomBlockContainer"] {
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 
@@ -2358,6 +2358,10 @@ button[data-testid="stSidebarCollapseButton"]:hover svg,
   .block-container {
     padding-left: 1rem;
     padding-right: 1rem;
+    padding-bottom: 12.5rem;
+  }
+  .stApp [data-testid="stBottomBlockContainer"] {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
   }
   .st-key-hero {
     padding: 18px 20px 10px;
@@ -2367,7 +2371,7 @@ button[data-testid="stSidebarCollapseButton"]:hover svg,
 @media (max-width: 640px) {
   .block-container {
     padding-top: 0.75rem;
-    padding-bottom: 10.5rem;
+    padding-bottom: 12.5rem;
     padding-left: 0.85rem;
     padding-right: 0.85rem;
   }
@@ -2458,10 +2462,10 @@ button[data-testid="stSidebarCollapseButton"]:hover svg,
     min-height: 3.7rem;
     padding: 0.75rem 0.95rem;
   }
-  [data-testid="stBottomBlockContainer"] {
+  .stApp [data-testid="stBottomBlockContainer"] {
     padding-left: 0.85rem !important;
     padding-right: 0.85rem !important;
-    padding-bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
   }
   [data-testid="stChatInput"] > div {
     border-radius: 15px !important;
